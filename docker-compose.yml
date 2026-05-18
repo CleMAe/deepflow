@@ -1,0 +1,79 @@
+# DeepFlow V1.0 — Day 1 compose (P9)
+# Requires: Docker Compose v2, NVIDIA Container Toolkit for gpu-train on GPU hosts.
+
+name: deepflow
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: deepflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-deepflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deepflow}
+      POSTGRES_DB: ${POSTGRES_DB:-deepflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepflow} -d ${POSTGRES_DB:-deepflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: deepflow-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-deepflow}:${POSTGRES_PASSWORD:-deepflow}@db:5432/${POSTGRES_DB:-deepflow}
+      STORAGE_ROOT: /data/storage
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - storage_data:/data/storage
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: deepflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+
+  gpu-train:
+    build:
+      context: .
+      dockerfile: docker/gpu-train/Dockerfile
+    container_name: deepflow-gpu-train
+    restart: unless-stopped
+    profiles:
+      - gpu
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - storage_data:/data/storage:ro
+
+volumes:
+  postgres_data:
+  storage_data:
