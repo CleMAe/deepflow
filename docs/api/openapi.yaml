@@ -1,0 +1,3348 @@
+openapi: 3.0.3
+info:
+  title: DeepFlow API
+  description: End-to-end deep learning platform API — Data Upload → Cleaning → Model Building → Training → Inference → Agent
+  version: 1.0.0
+  contact:
+    name: DeepFlow Team
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Auth
+    description: Authentication & user management
+  - name: Projects
+    description: Project CRUD
+  - name: Datasets
+    description: Dataset upload & management
+  - name: Cleaning
+    description: Data cleaning, EDA, augmentation & splitting
+  - name: ModelLibrary
+    description: Pre-built model library
+  - name: Models
+    description: Project model configuration
+  - name: Training
+    description: Training job management & monitoring
+  - name: Experiments
+    description: Experiment tracking & comparison
+  - name: Inference
+    description: Model evaluation, batch & online inference
+  - name: Agent
+    description: Agent management, chat & tool binding
+
+paths:
+  # ─── Auth (P6) ────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: authLogin
+      tags: [Auth]
+      summary: Login with username and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/register:
+    post:
+      operationId: authRegister
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/refresh:
+    post:
+      operationId: authRefresh
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+
+  /auth/me:
+    get:
+      operationId: authMe
+      tags: [Auth]
+      summary: Get current user info
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  # ─── Projects (P6) ────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [Projects]
+      summary: List projects
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated project list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedProjects'
+
+    post:
+      operationId: createProject
+      tags: [Projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: getProject
+      tags: [Projects]
+      summary: Get project detail
+      responses:
+        '200':
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateProject
+      tags: [Projects]
+      summary: Update project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+    delete:
+      operationId: deleteProject
+      tags: [Projects]
+      summary: Delete project
+      responses:
+        '200':
+          description: Project deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Datasets (P7) ────────────────────────────────────────
+  /projects/{id}/datasets/upload/init:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: initDatasetUpload
+      tags: [Datasets]
+      summary: Initialize a chunked upload session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadInitRequest'
+      responses:
+        '200':
+          description: Upload session created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadSession'
+
+  /projects/{id}/datasets/upload/{upload_id}/chunk:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: uploadChunk
+      tags: [Datasets]
+      summary: Upload a file chunk
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [chunk, chunk_index, total_chunks]
+              properties:
+                chunk:
+                  type: string
+                  format: binary
+                chunk_index:
+                  type: integer
+                total_chunks:
+                  type: integer
+      responses:
+        '200':
+          description: Chunk received
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          received_chunks:
+                            type: array
+                            items:
+                              type: integer
+
+  /projects/{id}/datasets/upload/{upload_id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: completeUpload
+      tags: [Datasets]
+      summary: Merge all chunks and finalize upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [total_chunks]
+              properties:
+                total_chunks:
+                  type: integer
+                dataset_name:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Upload completed, dataset created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dataset'
+
+  /projects/{id}/datasets/upload:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: uploadDatasetSimple
+      tags: [Datasets]
+      summary: Simple single-file upload (< 500MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, name]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                name:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Dataset uploaded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dataset'
+
+  /projects/{id}/datasets:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listDatasets
+      tags: [Datasets]
+      summary: List datasets in project
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json, image, other]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [uploading, ready, cleaning, cleaned, error]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated dataset list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedDatasets'
+
+    post:
+      operationId: createDataset
+      tags: [Datasets]
+      summary: Register dataset metadata (without file upload)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetCreate'
+      responses:
+        '201':
+          description: Dataset created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dataset'
+
+  /projects/{id}/datasets/{ds_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    get:
+      operationId: getDataset
+      tags: [Datasets]
+      summary: Get dataset detail
+      responses:
+        '200':
+          description: Dataset detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dataset'
+    put:
+      operationId: updateDataset
+      tags: [Datasets]
+      summary: Update dataset metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetUpdate'
+      responses:
+        '200':
+          description: Dataset updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dataset'
+    delete:
+      operationId: deleteDataset
+      tags: [Datasets]
+      summary: Delete dataset
+      responses:
+        '200':
+          description: Dataset deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /projects/{id}/datasets/{ds_id}/preview:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    get:
+      operationId: previewDataset
+      tags: [Datasets]
+      summary: Preview dataset (first 100 rows)
+      parameters:
+        - name: rows
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+      responses:
+        '200':
+          description: Dataset preview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DatasetPreview'
+
+  /projects/{id}/datasets/{ds_id}/images:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    get:
+      operationId: listDatasetImages
+      tags: [Datasets]
+      summary: Image gallery with thumbnails and labels
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: label
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated image list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedImages'
+
+  /projects/{id}/datasets/{ds_id}/labels:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    put:
+      operationId: updateImageLabels
+      tags: [Datasets]
+      summary: Batch update image labels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchLabelUpdate'
+      responses:
+        '200':
+          description: Labels updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          updated_count:
+                            type: integer
+
+  # ─── Cleaning (P7) ────────────────────────────────────────
+  /projects/{id}/datasets/{ds_id}/clean/missing:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: cleanMissing
+      tags: [Cleaning]
+      summary: Handle missing values
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanMissingRequest'
+      responses:
+        '200':
+          description: Missing values handled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CleaningResult'
+
+  /projects/{id}/datasets/{ds_id}/clean/outlier:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: detectOutliers
+      tags: [Cleaning]
+      summary: Detect and handle outliers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanOutlierRequest'
+      responses:
+        '200':
+          description: Outliers handled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CleaningResult'
+
+  /projects/{id}/datasets/{ds_id}/clean/dedup:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: deduplicate
+      tags: [Cleaning]
+      summary: Remove duplicate rows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanDedupRequest'
+      responses:
+        '200':
+          description: Duplicates removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CleaningResult'
+
+  /projects/{id}/datasets/{ds_id}/clean/encode:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: encodeColumns
+      tags: [Cleaning]
+      summary: Encode categorical columns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanEncodeRequest'
+      responses:
+        '200':
+          description: Encoding complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CleaningResult'
+
+  /projects/{id}/datasets/{ds_id}/clean/type-convert:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: typeConvert
+      tags: [Cleaning]
+      summary: Convert column data types
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanTypeConvertRequest'
+      responses:
+        '200':
+          description: Type conversion complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CleaningResult'
+
+  /projects/{id}/datasets/{ds_id}/eda:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: runEDA
+      tags: [Cleaning]
+      summary: Run one-click EDA analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EDARequest'
+      responses:
+        '200':
+          description: EDA analysis started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EDAReport'
+
+  /projects/{id}/datasets/{ds_id}/eda/report:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    get:
+      operationId: getEDAReport
+      tags: [Cleaning]
+      summary: Get EDA report
+      responses:
+        '200':
+          description: EDA report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EDAReport'
+
+  /projects/{id}/datasets/{ds_id}/augment:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: augmentDataset
+      tags: [Cleaning]
+      summary: Apply CV data augmentation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AugmentRequest'
+      responses:
+        '200':
+          description: Augmentation complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AugmentResult'
+
+  /projects/{id}/datasets/{ds_id}/split:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/DatasetId'
+    post:
+      operationId: splitDataset
+      tags: [Cleaning]
+      summary: Split dataset into train/val/test
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SplitRequest'
+      responses:
+        '200':
+          description: Dataset split complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SplitResult'
+
+  # ─── Model Library (P8) ───────────────────────────────────
+  /models/library:
+    get:
+      operationId: listModelLibrary
+      tags: [ModelLibrary]
+      summary: List pre-built models
+      parameters:
+        - name: task_type
+          in: query
+          schema:
+            type: string
+            enum: [classification, regression, object_detection, segmentation]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model library list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LibraryModel'
+
+  /models/library/{model_id}:
+    parameters:
+      - name: model_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getModelLibraryDetail
+      tags: [ModelLibrary]
+      summary: Get pre-built model detail
+      responses:
+        '200':
+          description: Model detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LibraryModel'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Models (P8) ──────────────────────────────────────────
+  /projects/{id}/models:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listProjectModels
+      tags: [Models]
+      summary: List project model configurations
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated model list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedModels'
+
+    post:
+      operationId: createProjectModel
+      tags: [Models]
+      summary: Create a model configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelCreate'
+      responses:
+        '201':
+          description: Model configuration created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Model'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{id}/models/{m_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: m_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getProjectModel
+      tags: [Models]
+      summary: Get model configuration detail
+      responses:
+        '200':
+          description: Model detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Model'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateProjectModel
+      tags: [Models]
+      summary: Update model configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelUpdate'
+      responses:
+        '200':
+          description: Model updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Model'
+
+  /projects/{id}/models/{m_id}/validate:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: m_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: validateModelConfig
+      tags: [Models]
+      summary: Validate model parameter configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelValidateRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ValidationResult'
+
+  /projects/{id}/models/{m_id}/pretrained:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: m_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: loadPretrainedWeights
+      tags: [Models]
+      summary: Load pretrained weights for model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                  enum: [huggingface, modelscope, local]
+                  default: huggingface
+                repo_id:
+                  type: string
+                  description: Repository ID (e.g. "microsoft/resnet-18")
+      responses:
+        '200':
+          description: Pretrained weights loading started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [loading, ready, failed]
+                          model_path:
+                            type: string
+
+  # ─── Training (P8) ────────────────────────────────────────
+  /projects/{id}/training-jobs:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listTrainingJobs
+      tags: [Training]
+      summary: List training jobs
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TrainingStatus'
+      responses:
+        '200':
+          description: Paginated training job list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedTrainingJobs'
+
+    post:
+      operationId: createTrainingJob
+      tags: [Training]
+      summary: Create a training job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingJobCreate'
+      responses:
+        '201':
+          description: Training job created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{id}/training-jobs/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getTrainingJob
+      tags: [Training]
+      summary: Get training job detail
+      responses:
+        '200':
+          description: Training job detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+
+  /projects/{id}/training-jobs/{job_id}/start:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: startTrainingJob
+      tags: [Training]
+      summary: Start a training job
+      responses:
+        '200':
+          description: Training job started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+
+  /projects/{id}/training-jobs/{job_id}/pause:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: pauseTrainingJob
+      tags: [Training]
+      summary: Pause a running training job
+      responses:
+        '200':
+          description: Training job paused
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+
+  /projects/{id}/training-jobs/{job_id}/resume:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: resumeTrainingJob
+      tags: [Training]
+      summary: Resume a paused training job
+      responses:
+        '200':
+          description: Training job resumed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+
+  /projects/{id}/training-jobs/{job_id}/stop:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: stopTrainingJob
+      tags: [Training]
+      summary: Stop (terminate) a training job
+      responses:
+        '200':
+          description: Training job stopped
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingJob'
+
+  /ws/training/{job_id}:
+    parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: trainingWebSocket
+      tags: [Training]
+      summary: WebSocket endpoint for real-time training monitoring
+      description: |
+        Upgrade to WebSocket. Server pushes messages with types:
+        - `metrics`: training metrics (loss, accuracy, lr, resource usage)
+        - `log`: training log lines
+        - `alert`: anomaly alerts
+        - `status_change`: job status transition
+        - `progress`: epoch/step progress
+      responses:
+        '101':
+          description: WebSocket handshake successful
+
+  /projects/{id}/training-jobs/{job_id}/logs:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getTrainingLogs
+      tags: [Training]
+      summary: Get training logs
+      parameters:
+        - name: tail
+          in: query
+          schema:
+            type: integer
+            default: 200
+      responses:
+        '200':
+          description: Training logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          logs:
+                            type: array
+                            items:
+                              type: string
+
+  /projects/{id}/training-jobs/{job_id}/checkpoints:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listCheckpoints
+      tags: [Training]
+      summary: List saved checkpoints
+      responses:
+        '200':
+          description: Checkpoint list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          checkpoints:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Checkpoint'
+
+  # ─── Experiments (P8) ─────────────────────────────────────
+  /projects/{id}/experiments:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listExperiments
+      tags: [Experiments]
+      summary: List experiments
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated experiment list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedExperiments'
+
+  /projects/{id}/experiments/{exp_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: exp_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getExperiment
+      tags: [Experiments]
+      summary: Get experiment detail
+      responses:
+        '200':
+          description: Experiment detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Experiment'
+    put:
+      operationId: updateExperiment
+      tags: [Experiments]
+      summary: Update experiment tags/notes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExperimentUpdate'
+      responses:
+        '200':
+          description: Experiment updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Experiment'
+
+  /projects/{id}/experiments/compare:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: compareExperiments
+      tags: [Experiments]
+      summary: Compare multiple experiments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [experiment_ids]
+              properties:
+                experiment_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 2
+      responses:
+        '200':
+          description: Experiment comparison data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExperimentComparison'
+
+  # ─── Inference (P7/P8) ────────────────────────────────────
+  /projects/{id}/inference/evaluate:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: evaluateModel
+      tags: [Inference]
+      summary: Evaluate model on test set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateRequest'
+      responses:
+        '200':
+          description: Evaluation complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EvaluateResult'
+
+  /projects/{id}/inference/batch:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: batchInference
+      tags: [Inference]
+      summary: Run batch inference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchInferenceRequest'
+      responses:
+        '200':
+          description: Batch inference started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/InferenceTask'
+
+  /projects/{id}/inference/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getInferenceResult
+      tags: [Inference]
+      summary: Get inference task result
+      responses:
+        '200':
+          description: Inference result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/InferenceTask'
+
+  /projects/{id}/inference/online:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: onlineInference
+      tags: [Inference]
+      summary: Online single-item inference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineInferenceRequest'
+      responses:
+        '200':
+          description: Inference result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OnlineInferenceResult'
+
+  /projects/{id}/inference/export-onnx:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: exportOnnx
+      tags: [Inference]
+      summary: Export model to ONNX format
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportOnnxRequest'
+      responses:
+        '200':
+          description: ONNX export started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          onnx_path:
+                            type: string
+                          status:
+                            type: string
+                            enum: [exporting, ready, failed]
+
+  # ─── Agent (P1) ───────────────────────────────────────────
+  /projects/{id}/agents:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      operationId: listAgents
+      tags: [Agent]
+      summary: List agents in project
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated agent list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedAgents'
+
+    post:
+      operationId: createAgent
+      tags: [Agent]
+      summary: Create an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreate'
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Agent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{id}/agents/{agent_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAgent
+      tags: [Agent]
+      summary: Get agent detail
+      responses:
+        '200':
+          description: Agent detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Agent'
+    put:
+      operationId: updateAgent
+      tags: [Agent]
+      summary: Update agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Agent updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Agent'
+    delete:
+      operationId: deleteAgent
+      tags: [Agent]
+      summary: Delete agent
+      responses:
+        '200':
+          description: Agent deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /projects/{id}/agents/{agent_id}/tools/bind:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: bindAgentTool
+      tags: [Agent]
+      summary: Bind a model tool to agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolBindRequest'
+      responses:
+        '200':
+          description: Tool bound
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTool'
+
+  /projects/{id}/agents/{agent_id}/tools:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listAgentTools
+      tags: [Agent]
+      summary: List bound tools for agent
+      responses:
+        '200':
+          description: Tool list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AgentTool'
+
+  /projects/{id}/agents/{agent_id}/chat:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: agentChat
+      tags: [Agent]
+      summary: Chat with agent (SSE streaming)
+      description: |
+        Sends a message to the agent. Response is streamed via Server-Sent Events (SSE).
+        Each SSE event has format: `data: {json}\n\n`
+
+        Event types:
+        - `{"type": "token", "content": "..."}` — streaming text token
+        - `{"type": "tool_call", "name": "...", "args": {...}}` — tool invocation
+        - `{"type": "tool_result", "name": "...", "result": {...}}` — tool result
+        - `{"type": "done", "message_id": "..."}` — stream complete
+        - `{"type": "error", "message": "..."}` — error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE event stream
+
+  /projects/{id}/agents/{agent_id}/chat/history:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getChatHistory
+      tags: [Agent]
+      summary: Get chat history
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedChatHistory'
+
+  /projects/{id}/agents/{agent_id}/prompts:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listPromptTemplates
+      tags: [Agent]
+      summary: List prompt templates
+      responses:
+        '200':
+          description: Prompt template list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PromptTemplate'
+
+    post:
+      operationId: savePromptTemplate
+      tags: [Agent]
+      summary: Save a prompt template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptTemplateCreate'
+      responses:
+        '201':
+          description: Prompt template saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PromptTemplate'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Project UUID
+    DatasetId:
+      name: ds_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Dataset UUID
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 10-01-001
+            message: "Invalid request parameters"
+            data: null
+            request_id: "a1b2c3d4"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: "10-03-001"
+            message: "Invalid or expired token"
+            data: null
+            request_id: "a1b2c3d4"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: "20-02-001"
+            message: "Resource not found"
+            data: null
+            request_id: "a1b2c3d4"
+    Forbidden:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: "10-03-002"
+            message: "Permission denied"
+            data: null
+            request_id: "a1b2c3d4"
+
+  schemas:
+    # ─── Common ────────────────────────────────────────────
+    ApiResponse:
+      type: object
+      required: [code, message, data, request_id]
+      properties:
+        code:
+          type: integer
+          description: "0 = success, 8-digit error code on failure (XX-YY-ZZZ)"
+        message:
+          type: string
+        data:
+          nullable: true
+        request_id:
+          type: string
+          format: uuid
+
+    Pagination:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+
+    # ─── Auth ──────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+        password:
+          type: string
+          format: password
+          minLength: 6
+        role:
+          type: string
+          enum: [admin, developer, viewer]
+          default: developer
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          default: bearer
+        expires_in:
+          type: integer
+          description: Seconds until access token expiry
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, developer, viewer]
+        created_at:
+          type: string
+          format: date-time
+
+    # ─── Project ───────────────────────────────────────────
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+          maxLength: 1024
+        storage_quota:
+          type: integer
+          description: Storage quota in MB
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+          maxLength: 1024
+        storage_quota:
+          type: integer
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+        storage_quota:
+          type: integer
+        storage_used:
+          type: integer
+          description: Used storage in MB
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedProjects:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Project'
+
+    # ─── Dataset ───────────────────────────────────────────
+    UploadInitRequest:
+      type: object
+      required: [filename, total_size, total_chunks]
+      properties:
+        filename:
+          type: string
+        total_size:
+          type: integer
+          description: File size in bytes
+        total_chunks:
+          type: integer
+        dataset_name:
+          type: string
+        format:
+          type: string
+          enum: [csv, json, image, other]
+          description: Data format hint
+
+    UploadSession:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        chunk_size:
+          type: integer
+          description: Recommended chunk size in bytes
+        received_chunks:
+          type: array
+          items:
+            type: integer
+
+    DatasetCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        format:
+          type: string
+          enum: [csv, json, image, other]
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    DatasetUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        format:
+          type: string
+          enum: [csv, json, image, other]
+        file_path:
+          type: string
+        num_samples:
+          type: integer
+        num_columns:
+          type: integer
+        columns_meta:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnMeta'
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [uploading, ready, cleaning, cleaned, error]
+        size_bytes:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ColumnMeta:
+      type: object
+      properties:
+        name:
+          type: string
+        dtype:
+          type: string
+        nullable:
+          type: boolean
+        unique_count:
+          type: integer
+        sample_values:
+          type: array
+          items: {}
+
+    DatasetPreview:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        total_rows:
+          type: integer
+
+    ImageItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        thumbnail_path:
+          type: string
+        labels:
+          type: array
+          items:
+            type: string
+        width:
+          type: integer
+        height:
+          type: integer
+
+    BatchLabelUpdate:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [image_id, labels]
+            properties:
+              image_id:
+                type: string
+                format: uuid
+              labels:
+                type: array
+                items:
+                  type: string
+
+    PaginatedDatasets:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Dataset'
+
+    PaginatedImages:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ImageItem'
+
+    # ─── Cleaning ──────────────────────────────────────────
+    CleanMissingRequest:
+      type: object
+      required: [strategy]
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Target columns (empty = all columns with missing values)
+        strategy:
+          type: string
+          enum: [drop_row, fill_mean, fill_median, fill_mode, fill_constant, forward_fill, backward_fill]
+        fill_value:
+          description: Value for fill_constant strategy
+        create_new_version:
+          type: boolean
+          default: true
+
+    CleanOutlierRequest:
+      type: object
+      required: [columns, method]
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        method:
+          type: string
+          enum: [zscore, iqr, isolation_forest]
+        threshold:
+          type: number
+          description: Z-score threshold (default 3.0) or IQR multiplier (default 1.5)
+        action:
+          type: string
+          enum: [drop, clip, mark]
+          default: drop
+
+    CleanDedupRequest:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Columns to check for duplicates (empty = all columns)
+        keep:
+          type: string
+          enum: [first, last, none]
+          default: first
+
+    CleanEncodeRequest:
+      type: object
+      required: [columns, method]
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        method:
+          type: string
+          enum: [label_encoding, one_hot, target_encoding, frequency_encoding]
+
+    CleanTypeConvertRequest:
+      type: object
+      required: [conversions]
+      properties:
+        conversions:
+          type: array
+          items:
+            type: object
+            required: [column, target_type]
+            properties:
+              column:
+                type: string
+              target_type:
+                type: string
+                enum: [int, float, str, bool, datetime]
+              datetime_format:
+                type: string
+                description: Format string for datetime conversion
+
+    CleaningResult:
+      type: object
+      properties:
+        rows_before:
+          type: integer
+        rows_after:
+          type: integer
+        columns_affected:
+          type: array
+          items:
+            type: string
+        changes_summary:
+          type: object
+          additionalProperties: true
+        dataset_id:
+          type: string
+          format: uuid
+
+    # ─── EDA ───────────────────────────────────────────────
+    EDARequest:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Columns to analyze (empty = all)
+        include_visualizations:
+          type: boolean
+          default: true
+
+    EDAReport:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+          format: uuid
+        summary:
+          type: object
+          properties:
+            num_rows:
+              type: integer
+            num_columns:
+              type: integer
+            num_missing:
+              type: integer
+            duplicate_rows:
+              type: integer
+        column_stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnStat'
+        correlations:
+          type: object
+          description: Correlation matrix for numeric columns
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
+        visualizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Visualization'
+        created_at:
+          type: string
+          format: date-time
+
+    ColumnStat:
+      type: object
+      properties:
+        name:
+          type: string
+        dtype:
+          type: string
+        missing_count:
+          type: integer
+        missing_pct:
+          type: number
+        unique_count:
+          type: integer
+        mean:
+          type: number
+        std:
+          type: number
+        min:
+          type: number
+        q25:
+          type: number
+        median:
+          type: number
+        q75:
+          type: number
+        max:
+          type: number
+        top_values:
+          type: array
+          items:
+            type: object
+            properties:
+              value: {}
+              count:
+                type: integer
+
+    Visualization:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [histogram, boxplot, scatter, heatmap, bar, pie]
+        title:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: ECharts-compatible chart config
+
+    # ─── Augmentation ──────────────────────────────────────
+    AugmentRequest:
+      type: object
+      required: [transforms]
+      properties:
+        transforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/AugmentTransform'
+        num_augmented:
+          type: integer
+          default: 1
+          description: Number of augmented copies per original image
+        output_dataset_name:
+          type: string
+
+    AugmentTransform:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [rotate, flip_horizontal, flip_vertical, color_jitter, random_crop, mixup, cutmix, gaussian_blur]
+        params:
+          type: object
+          additionalProperties: true
+          description: "Transform-specific parameters (e.g. {\"angle\": 15}, {\"brightness\": 0.2})"
+
+    AugmentResult:
+      type: object
+      properties:
+        original_count:
+          type: integer
+        augmented_count:
+          type: integer
+        new_dataset_id:
+          type: string
+          format: uuid
+        output_dataset_name:
+          type: string
+
+    # ─── Split ─────────────────────────────────────────────
+    SplitRequest:
+      type: object
+      required: [ratios]
+      properties:
+        ratios:
+          type: object
+          required: [train]
+          properties:
+            train:
+              type: number
+              minimum: 0.01
+              maximum: 0.99
+            val:
+              type: number
+              minimum: 0
+            test:
+              type: number
+              minimum: 0
+          description: Ratios must sum to 1.0
+        stratify_column:
+          type: string
+          description: Column for stratified splitting
+        random_seed:
+          type: integer
+          default: 42
+
+    SplitResult:
+      type: object
+      properties:
+        train_dataset_id:
+          type: string
+          format: uuid
+        val_dataset_id:
+          type: string
+          format: uuid
+          nullable: true
+        test_dataset_id:
+          type: string
+          format: uuid
+          nullable: true
+        train_count:
+          type: integer
+        val_count:
+          type: integer
+        test_count:
+          type: integer
+
+    # ─── Model Library ─────────────────────────────────────
+    LibraryModel:
+      type: object
+      properties:
+        model_id:
+          type: string
+        name:
+          type: string
+        arch_type:
+          type: string
+          enum: [resnet18, resnet34, resnet50, efficientnet_b0, efficientnet_b1, mlp, custom]
+        task_type:
+          type: string
+          enum: [classification, regression, object_detection, segmentation]
+        description:
+          type: string
+        input_shape:
+          type: array
+          items:
+            type: integer
+        num_params:
+          type: integer
+        default_hyperparams:
+          type: object
+          additionalProperties: true
+        supported_datasets:
+          type: array
+          items:
+            type: string
+            enum: [csv, json, image]
+        pretrained_available:
+          type: boolean
+
+    # ─── Model Config ──────────────────────────────────────
+    ModelCreate:
+      type: object
+      required: [name, arch_type]
+      properties:
+        name:
+          type: string
+        arch_type:
+          type: string
+          enum: [resnet18, resnet34, resnet50, efficientnet_b0, efficientnet_b1, mlp, custom]
+        params_cfg:
+          type: object
+          additionalProperties: true
+          description: Architecture-specific configuration (layers, hidden_dims, etc.)
+        description:
+          type: string
+
+    ModelUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        params_cfg:
+          type: object
+          additionalProperties: true
+        description:
+          type: string
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        arch_type:
+          type: string
+        params_cfg:
+          type: object
+          additionalProperties: true
+        pretrained:
+          type: boolean
+        pretrained_source:
+          type: string
+        model_path:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ModelValidateRequest:
+      type: object
+      properties:
+        params_cfg:
+          type: object
+          additionalProperties: true
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    PaginatedModels:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Model'
+
+    # ─── Training ──────────────────────────────────────────
+    TrainingStatus:
+      type: string
+      enum: [pending, running, paused, success, failed, cancelled]
+
+    TrainingJobCreate:
+      type: object
+      required: [name, model_id, dataset_id]
+      properties:
+        name:
+          type: string
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        val_dataset_id:
+          type: string
+          format: uuid
+        hyperparams:
+          type: object
+          additionalProperties: true
+          description: Training hyperparameters
+          properties:
+            epochs:
+              type: integer
+              default: 10
+            batch_size:
+              type: integer
+              default: 32
+            learning_rate:
+              type: number
+              default: 0.001
+            optimizer:
+              type: string
+              enum: [sgd, adam, adamw, rmsprop]
+              default: adam
+            loss_function:
+              type: string
+              enum: [cross_entropy, mse, bce, bce_with_logits, nll, l1, huber]
+              default: cross_entropy
+            weight_decay:
+              type: number
+              default: 0.0
+            momentum:
+              type: number
+            lr_scheduler:
+              type: string
+              enum: [none, step, cosine, exponential, reduce_on_plateau]
+              default: none
+            lr_scheduler_params:
+              type: object
+              additionalProperties: true
+            grad_accum_steps:
+              type: integer
+              default: 1
+            mixed_precision:
+              type: boolean
+              default: false
+            early_stopping:
+              type: object
+              properties:
+                patience:
+                  type: integer
+                  default: 5
+                metric:
+                  type: string
+                  default: val_loss
+                mode:
+                  type: string
+                  enum: [min, max]
+                  default: min
+                min_delta:
+                  type: number
+                  default: 0.0
+            checkpoint_every_n_epochs:
+              type: integer
+              default: 1
+            max_grad_norm:
+              type: number
+        device:
+          type: string
+          enum: [cpu, cuda, auto]
+          default: auto
+        description:
+          type: string
+
+    TrainingJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        val_dataset_id:
+          type: string
+          format: uuid
+        hyperparams:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: '#/components/schemas/TrainingStatus'
+        device:
+          type: string
+        current_epoch:
+          type: integer
+        total_epochs:
+          type: integer
+        metrics:
+          type: object
+          properties:
+            train_loss:
+              type: number
+            val_loss:
+              type: number
+            accuracy:
+              type: number
+            best_val_loss:
+              type: number
+            best_accuracy:
+              type: number
+        checkpoint:
+          type: string
+          description: Path to best checkpoint
+        error_message:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Checkpoint:
+      type: object
+      properties:
+        epoch:
+          type: integer
+        step:
+          type: integer
+        path:
+          type: string
+        is_best:
+          type: boolean
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+        file_size:
+          type: integer
+          description: Size in bytes
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedTrainingJobs:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TrainingJob'
+
+    # ─── Experiments ───────────────────────────────────────
+    Experiment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        metrics:
+          type: object
+          additionalProperties: true
+        params_snap:
+          type: object
+          additionalProperties: true
+          description: Snapshot of hyperparameters used
+        tags:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ExperimentUpdate:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+
+    ExperimentComparison:
+      type: object
+      properties:
+        experiments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Experiment'
+        metric_comparison:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: number
+          description: Metric values across experiments
+        param_diff:
+          type: object
+          additionalProperties: true
+          description: Parameters that differ between experiments
+
+    PaginatedExperiments:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Experiment'
+
+    # ─── Inference ─────────────────────────────────────────
+    EvaluateRequest:
+      type: object
+      required: [model_id, dataset_id]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        checkpoint_path:
+          type: string
+        metrics:
+          type: array
+          items:
+            type: string
+          default: [accuracy, f1, precision, recall]
+          description: Metrics to compute
+
+    EvaluateResult:
+      type: object
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+        confusion_matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+        classification_report:
+          type: object
+          additionalProperties: true
+        num_samples:
+          type: integer
+
+    BatchInferenceRequest:
+      type: object
+      required: [model_id, dataset_id]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        checkpoint_path:
+          type: string
+        output_format:
+          type: string
+          enum: [csv, json]
+          default: csv
+
+    InferenceTask:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        dataset_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, success, failed]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+        result_path:
+          type: string
+        predictions:
+          type: array
+          items:
+            type: object
+            properties:
+              input: {}
+              prediction: {}
+              confidence:
+                type: number
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+
+    OnlineInferenceRequest:
+      type: object
+      required: [model_id, input_data]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        checkpoint_path:
+          type: string
+        input_data:
+          oneOf:
+            - type: object
+              additionalProperties: true
+              description: Tabular input (column → value)
+            - type: string
+              description: Base64-encoded image for CV models
+
+    OnlineInferenceResult:
+      type: object
+      properties:
+        prediction: {}
+        confidence:
+          type: number
+        probabilities:
+          type: object
+          additionalProperties:
+            type: number
+        latency_ms:
+          type: number
+
+    ExportOnnxRequest:
+      type: object
+      required: [model_id]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        checkpoint_path:
+          type: string
+        opset_version:
+          type: integer
+          default: 17
+        dynamic_batch:
+          type: boolean
+          default: true
+
+    # ─── Agent ─────────────────────────────────────────────
+    AgentCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        system_prompt:
+          type: string
+        model_config:
+          type: object
+          properties:
+            provider:
+              type: string
+              enum: [openai, anthropic, azure, mock]
+              default: mock
+            model:
+              type: string
+              default: gpt-4
+            temperature:
+              type: number
+              default: 0.7
+            max_tokens:
+              type: integer
+              default: 2048
+        description:
+          type: string
+
+    AgentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        system_prompt:
+          type: string
+        model_config:
+          type: object
+          properties:
+            provider:
+              type: string
+            model:
+              type: string
+            temperature:
+              type: number
+            max_tokens:
+              type: integer
+        status:
+          type: string
+          enum: [active, inactive]
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        model_config:
+          type: object
+          additionalProperties: true
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentTool'
+        status:
+          type: string
+          enum: [active, inactive]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentTool:
+      type: object
+      properties:
+        tool_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [model_inference, api_call, custom]
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Tool configuration (endpoint, parameters schema, etc.)
+        bound_at:
+          type: string
+          format: date-time
+
+    ToolBindRequest:
+      type: object
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                enum: [model_inference, api_call, custom]
+              model_id:
+                type: string
+                format: uuid
+                description: Required when type = model_inference
+              description:
+                type: string
+              config:
+                type: object
+                additionalProperties: true
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        conversation_id:
+          type: string
+          format: uuid
+          description: Continue an existing conversation
+        stream:
+          type: boolean
+          default: true
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system, tool]
+        content:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              arguments:
+                type: object
+                additionalProperties: true
+              result: {}
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedChatHistory:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ChatMessage'
+
+    PromptTemplateCreate:
+      type: object
+      required: [name, template]
+      properties:
+        name:
+          type: string
+        template:
+          type: string
+        description:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+          description: Template variable names (e.g. ["context", "question"])
+
+    PromptTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        template:
+          type: string
+        description:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedAgents:
+      allOf:
+        - $ref: '#/components/schemas/Pagination'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Agent'
