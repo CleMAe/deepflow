@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { useProjectStore } from '@/stores/projectStore'
+import type { components } from '@/api/types'
+
+type PaginatedProjects = components['schemas']['PaginatedProjects']
+type Project = components['schemas']['Project']
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -13,7 +17,7 @@ export default function DashboardPage() {
     queryKey: ['projects'],
     queryFn: async () => {
       const res = await api.get('/projects')
-      return (res as { data: { items: unknown[] } }).data
+      return (res as { data: PaginatedProjects }).data
     },
   })
 
@@ -31,7 +35,7 @@ export default function DashboardPage() {
           <Card title="我的项目" extra={<Button type="primary">新建项目</Button>}>
             <List
               dataSource={data?.items || []}
-              renderItem={(item: { id: string; name: string; description: string }) => (
+              renderItem={(item: Project) => (
                 <List.Item
                   actions={[
                     <Button key="enter" type="link" onClick={() => navigate(`/projects/${item.id}/data`)}>

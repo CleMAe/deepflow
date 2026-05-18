@@ -3,6 +3,9 @@ import { UploadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import api from '@/lib/axios'
+import type { components } from '@/api/types'
+
+type PaginatedDatasets = components['schemas']['PaginatedDatasets']
 
 export default function ProjectDataPage() {
   const { projectId } = useParams()
@@ -11,7 +14,7 @@ export default function ProjectDataPage() {
     queryKey: ['datasets', projectId],
     queryFn: async () => {
       const res = await api.get(`/projects/${projectId}/datasets`)
-      return (res as { data: { items: unknown[] } }).data
+      return (res as { data: PaginatedDatasets }).data
     },
     enabled: !!projectId,
   })

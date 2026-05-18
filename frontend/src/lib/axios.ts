@@ -1,4 +1,7 @@
 import axios from 'axios'
+import type { components } from '@/api/types'
+
+type ApiResponse<T> = Omit<components['schemas']['ApiResponse'], 'data'> & { data: T }
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -43,3 +46,4 @@ api.interceptors.response.use(
 )
 
 export default api
+export type { ApiResponse }

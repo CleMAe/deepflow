@@ -3,6 +3,9 @@ import { Form, Input, Button, Card, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/axios'
 import { useUserStore } from '@/stores/userStore'
+import type { components } from '@/api/types'
+
+type TokenPair = components['schemas']['TokenPair']
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -13,9 +16,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await api.post('/auth/login', values)
-      const typedRes = res as { data: { access_token: string; refresh_token: string } }
-      setToken(typedRes.data.access_token)
-      localStorage.setItem('refresh_token', typedRes.data.refresh_token)
+      const typedRes = res as { data: TokenPair }
+      setToken(typedRes.data.access_token || null)
+      localStorage.setItem('refresh_token', typedRes.data.refresh_token || '')
       message.success('登录成功')
       navigate('/dashboard')
     } catch {

@@ -1,12 +1,7 @@
 import { create } from 'zustand'
+import type { components } from '@/api/types'
 
-interface Project {
-  id: string
-  name: string
-  description: string
-  owner_id: string
-  created_at: string
-}
+type Project = components['schemas']['Project']
 
 interface ProjectState {
   currentProject: Project | null

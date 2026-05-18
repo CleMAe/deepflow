@@ -1,10 +1,7 @@
 import { create } from 'zustand'
+import type { components } from '@/api/types'
 
-interface User {
-  id: string
-  username: string
-  role: string
-}
+type User = components['schemas']['User']
 
 interface UserState {
   user: User | null
