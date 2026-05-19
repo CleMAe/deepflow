@@ -8,19 +8,19 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import ERR_AUTH_INVALID, ERR_PROJECT_FORBIDDEN, ERR_PROJECT_NOT_FOUND, AppError
 from app.core.security import decode_token
 from app.db.session import get_db
-from src.infra.db.models.project import Project
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
 from app.services.dataset_service import DatasetService
 from app.services.storage_mock import MockFileStorage
 from app.services.upload_service import UploadService
+from shared.protocols import StorageProtocol
+from src.infra.db.models.project import Project
 
 _bearer = HTTPBearer(auto_error=False)
 

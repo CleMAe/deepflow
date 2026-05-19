@@ -1,9 +1,8 @@
 """User model — authentication & RBAC."""
 
-from datetime import datetime
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import Enum, String, Uuid
+from sqlalchemy import Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infra.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin

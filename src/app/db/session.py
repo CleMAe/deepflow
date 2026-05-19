@@ -7,7 +7,8 @@ from collections.abc import Generator
 from sqlalchemy.orm import Session
 
 from src.infra.db.base import Base
-from src.infra.db.session import get_engine, get_session as _infra_get_session
+from src.infra.db.session import get_engine
+from src.infra.db.session import get_session as _infra_get_session
 
 
 def get_db() -> Generator[Session, None, None]:

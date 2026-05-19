@@ -4,6 +4,8 @@ Pytest fixtures — SQLite in-memory DB with per-test transaction rollback.
 Wires FastAPI TestClient with dependency overrides for integration tests.
 """
 
+# ruff: noqa: E402 — sys.path must be configured before app/tests imports
+
 from __future__ import annotations
 
 import os
@@ -30,16 +32,15 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("DEV_ALLOW_ANONYMOUS", "false")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32chars-minimum")
 
+import src.infra.db.models  # noqa: F401, E402 — register ORM metadata
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from src.infra.db.base import Base as InfraBase  # noqa: E402
-import src.infra.db.models  # noqa: F401, E402 — register ORM metadata
-
-from tests.factories.base import TestRecordFactory
-from tests.factories.dataset import DatasetFactory
-from tests.factories.project import ProjectFactory
-from tests.factories.user import UserFactory
-from tests.support.models import Base as TestBase
+from tests.factories.base import TestRecordFactory  # noqa: E402
+from tests.factories.dataset import DatasetFactory  # noqa: E402
+from tests.factories.project import ProjectFactory  # noqa: E402
+from tests.factories.user import UserFactory  # noqa: E402
+from tests.support.models import Base as TestBase  # noqa: E402
 
 AUTH_PREFIX = "/api/v1/auth"
 
