@@ -1,0 +1,2 @@
+# Optional deps for scripts/gen_synthetic_data.py (Pillow for image generation)
+Pillow>=10.2.0,<11.0
