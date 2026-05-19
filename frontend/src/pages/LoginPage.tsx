@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Form, Input, Button, Card, message } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import api from '@/lib/axios'
 import { useUserStore } from '@/stores/userStore'
 import type { components } from '@/api/types'
@@ -9,6 +9,7 @@ type TokenPair = components['schemas']['TokenPair']
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const setToken = useUserStore((s) => s.setToken)
   const [loading, setLoading] = useState(false)
 
@@ -20,7 +21,9 @@ export default function LoginPage() {
       setToken(typedRes.access_token || null)
       localStorage.setItem('refresh_token', typedRes.refresh_token || '')
       message.success('登录成功')
-      navigate('/dashboard')
+      const redirectTo =
+        (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/dashboard'
+      navigate(redirectTo, { replace: true })
     } catch {
       message.error('登录失败')
     } finally {

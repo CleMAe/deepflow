@@ -4,56 +4,7 @@ import type { components } from '@/api/types'
 type EvaluateRequest = components['schemas']['EvaluateRequest']
 type OnlineInferenceRequest = components['schemas']['OnlineInferenceRequest']
 
-const mockModels = [
-  {
-    id: 'model-1',
-    project_id: 'proj-1',
-    name: 'ResNet-18 商品分类',
-    arch_type: 'resnet18',
-    params_cfg: {
-      num_classes: 3,
-      image_size: 224,
-    },
-    pretrained: true,
-    model_path: '/projects/proj-1/models/model-1/checkpoint/best.pth',
-    description: '用于商品图片分类的默认模型',
-    created_at: '2026-05-18T12:00:00Z',
-    updated_at: '2026-05-18T12:00:00Z',
-  },
-  {
-    id: 'model-2',
-    project_id: 'proj-1',
-    name: 'MLP 销售预测',
-    arch_type: 'mlp',
-    params_cfg: {
-      hidden_dims: [128, 64],
-      output_dim: 1,
-    },
-    pretrained: false,
-    model_path: '/projects/proj-1/models/model-2/checkpoint/latest.pth',
-    description: '用于结构化业务数据回归预测',
-    created_at: '2026-05-18T12:30:00Z',
-    updated_at: '2026-05-18T12:30:00Z',
-  },
-]
-
 export const inferenceHandlers = [
-  http.get('/api/v1/projects/:projectId/models', ({ params }) => {
-    const items = mockModels.filter((model) => model.project_id === params.projectId)
-
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: {
-        page: 1,
-        page_size: 20,
-        total: items.length,
-        items,
-      },
-      request_id: 'mock-p5-models',
-    })
-  }),
-
   http.post('/api/v1/projects/:projectId/inference/evaluate', async ({ request, params }) => {
     const payload = (await request.json()) as EvaluateRequest
 
