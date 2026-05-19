@@ -12,12 +12,16 @@ def error_code(module: int, category: int, sequence: int) -> int:
     return module * 1_000_000 + category * 1_000 + sequence
 
 
+# Project module (20)
+ERR_PROJECT_NOT_FOUND = error_code(20, 2, 1)
+ERR_PROJECT_FORBIDDEN = error_code(20, 3, 1)
+
 # Dataset module (30)
 ERR_DATASET_NOT_FOUND = error_code(30, 2, 1)
 ERR_DATASET_INVALID_PARAM = error_code(30, 1, 1)
 ERR_UPLOAD_NOT_FOUND = error_code(30, 2, 2)
 ERR_UPLOAD_INCOMPLETE = error_code(30, 4, 1)
-ERR_PROJECT_FORBIDDEN = error_code(30, 3, 1)
+ERR_DATASET_FORBIDDEN = error_code(30, 3, 1)
 
 # Auth (10)
 ERR_AUTH_MISSING = error_code(10, 3, 1)
@@ -41,7 +45,7 @@ class AppError(Exception):
         return cls(400, code, message, data)
 
     @classmethod
-    def forbidden(cls, message: str, *, code: int = ERR_PROJECT_FORBIDDEN, data: Any = None) -> AppError:
+    def forbidden(cls, message: str, *, code: int = ERR_DATASET_FORBIDDEN, data: Any = None) -> AppError:
         return cls(403, code, message, data)
 
     @classmethod
