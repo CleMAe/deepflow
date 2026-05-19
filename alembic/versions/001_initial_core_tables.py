@@ -5,6 +5,18 @@ Revises:
 Create Date: 2026-05-19
 
 Frozen per DeepFlow DDL spec (section 4.2) and openapi.yaml schemas.
+
+Enum columns use ``native_enum=False`` (VARCHAR + CHECK constraint). PostgreSQL
+does not create named ENUM types, so ``downgrade()`` only drops tables.
+
+If you later switch to ``native_enum=True``, extend ``downgrade()`` after
+``drop_table`` with::
+
+    op.execute("DROP TYPE IF EXISTS user_role")
+    op.execute("DROP TYPE IF EXISTS dataset_format")
+    op.execute("DROP TYPE IF EXISTS dataset_status")
+    op.execute("DROP TYPE IF EXISTS training_job_status")
+    op.execute("DROP TYPE IF EXISTS agent_status")
 """
 
 from typing import Sequence, Union
@@ -24,7 +36,7 @@ JSON = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column("username", sa.String(32), nullable=False),
         sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column(
@@ -40,10 +52,10 @@ def upgrade() -> None:
 
     op.create_table(
         "projects",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(128), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("owner_id", sa.Uuid(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("owner_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("storage_quota", sa.Integer(), nullable=False, server_default="10240"),
         sa.Column("storage_used", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -53,9 +65,9 @@ def upgrade() -> None:
 
     op.create_table(
         "datasets",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(256), nullable=False),
-        sa.Column("project_id", sa.Uuid(as_uuid=False), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("project_id", sa.Uuid(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column(
             "format",
             sa.Enum("csv", "json", "image", "other", name="dataset_format", native_enum=False),
@@ -82,8 +94,8 @@ def upgrade() -> None:
 
     op.create_table(
         "models",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
-        sa.Column("project_id", sa.Uuid(as_uuid=False), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("project_id", sa.Uuid(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column("name", sa.String(256), nullable=False),
         sa.Column("arch_type", sa.String(64), nullable=False),
         sa.Column("params_cfg", JSON, nullable=True),
@@ -98,12 +110,12 @@ def upgrade() -> None:
 
     op.create_table(
         "training_jobs",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
-        sa.Column("project_id", sa.Uuid(as_uuid=False), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("project_id", sa.Uuid(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column("name", sa.String(256), nullable=False),
-        sa.Column("model_id", sa.Uuid(as_uuid=False), sa.ForeignKey("models.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("dataset_id", sa.Uuid(as_uuid=False), sa.ForeignKey("datasets.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("val_dataset_id", sa.Uuid(as_uuid=False), sa.ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("model_id", sa.Uuid(as_uuid=True), sa.ForeignKey("models.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("dataset_id", sa.Uuid(as_uuid=True), sa.ForeignKey("datasets.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("val_dataset_id", sa.Uuid(as_uuid=True), sa.ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True),
         sa.Column("hyperparams", JSON, nullable=True),
         sa.Column(
             "status",
@@ -134,8 +146,8 @@ def upgrade() -> None:
 
     op.create_table(
         "agents",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
-        sa.Column("project_id", sa.Uuid(as_uuid=False), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("project_id", sa.Uuid(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column("name", sa.String(256), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("system_prompt", sa.Text(), nullable=True),
@@ -154,9 +166,9 @@ def upgrade() -> None:
 
     op.create_table(
         "experiments",
-        sa.Column("id", sa.Uuid(as_uuid=False), primary_key=True),
-        sa.Column("project_id", sa.Uuid(as_uuid=False), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("job_id", sa.Uuid(as_uuid=False), sa.ForeignKey("training_jobs.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("project_id", sa.Uuid(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("job_id", sa.Uuid(as_uuid=True), sa.ForeignKey("training_jobs.id", ondelete="CASCADE"), nullable=False),
         sa.Column("name", sa.String(256), nullable=True),
         sa.Column("metrics", JSON, nullable=True),
         sa.Column("params_snap", JSON, nullable=True),
@@ -169,6 +181,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # See module docstring: native_enum=False needs no DROP TYPE; add those if
+    # migrations are regenerated with native_enum=True.
     op.drop_table("experiments")
     op.drop_table("agents")
     op.drop_table("training_jobs")

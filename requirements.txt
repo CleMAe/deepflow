@@ -1,6 +1,6 @@
-# DeepFlow backend - P6 infra DDL migration
-sqlalchemy[asyncio]>=2.0,<3.0
+# DeepFlow backend dependencies (canonical location).
+# Do NOT add backend/requirements.txt — P6/P7/P9 merge all BE deps here.
+
+sqlalchemy>=2.0,<3.0
 alembic>=1.13,<2.0
-aiosqlite>=0.19,<1.0
-asyncpg>=0.29,<1.0
 psycopg2-binary>=2.9,<3.0

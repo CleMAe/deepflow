@@ -1,5 +1,6 @@
 """ML model configuration — per-project model definitions."""
 
+import uuid
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Boolean, ForeignKey, String, Text, Uuid
@@ -16,8 +17,8 @@ if TYPE_CHECKING:
 class MLModel(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
     __tablename__ = "models"
 
-    project_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

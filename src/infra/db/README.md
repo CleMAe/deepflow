@@ -22,3 +22,7 @@ alembic current         # show revision
 ```
 
 Default dev DB: `sqlite:///./deepflow.db` (see `.env.example` for PostgreSQL).
+
+Session: sync `get_session()` only (Day1). Use `Depends(get_session)` in FastAPI routers.
+
+Dependencies: root `requirements.txt` is the single source of truth for backend packages.

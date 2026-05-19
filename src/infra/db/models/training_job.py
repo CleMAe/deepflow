@@ -1,9 +1,9 @@
 """Training job model — training task lifecycle & metrics."""
 
+import enum
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
-
-import enum
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,27 +30,27 @@ class TrainingJobStatus(str, enum.Enum):
 class TrainingJob(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
     __tablename__ = "training_jobs"
 
-    project_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     name: Mapped[str] = mapped_column(String(256), nullable=False)
-    model_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    model_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("models.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-    dataset_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("datasets.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-    val_dataset_id: Mapped[Optional[str]] = mapped_column(
-        Uuid(as_uuid=False),
+    val_dataset_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("datasets.id", ondelete="SET NULL"),
         nullable=True,
     )

@@ -1,8 +1,8 @@
 """Agent model — LLM agent configuration & tools."""
 
-from typing import TYPE_CHECKING, Optional
-
 import enum
+import uuid
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,8 +22,8 @@ class AgentStatus(str, enum.Enum):
 class Agent(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
     __tablename__ = "agents"
 
-    project_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

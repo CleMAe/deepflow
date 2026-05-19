@@ -1,8 +1,8 @@
 """Dataset model — uploaded / cleaned data metadata."""
 
-from typing import TYPE_CHECKING, List, Optional
-
 import enum
+import uuid
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Enum, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,8 +34,8 @@ class Dataset(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
     __tablename__ = "datasets"
 
     name: Mapped[str] = mapped_column(String(256), nullable=False)
-    project_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

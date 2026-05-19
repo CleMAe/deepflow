@@ -1,7 +1,7 @@
 """SQLAlchemy declarative base and shared mixins."""
 
+import uuid
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from sqlalchemy import DateTime, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -16,10 +16,10 @@ class Base(DeclarativeBase):
 
 
 class UUIDPrimaryKeyMixin:
-    id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         primary_key=True,
-        default=lambda: str(uuid4()),
+        default=uuid.uuid4,
     )
 
 

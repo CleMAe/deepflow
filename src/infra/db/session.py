@@ -1,32 +1,33 @@
-"""Async database engine and session factory."""
+"""Sync database engine and session factory (Day1 default)."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from typing import Optional
 
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.infra.config import get_settings
 
 _engine = None
-_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+SessionLocal: Optional[sessionmaker[Session]] = None
 
 
-def init_engine(database_url: Optional[str] = None) -> None:
-    global _engine, _session_factory
+def init_engine(database_url: Optional[str] = None) -> sessionmaker[Session]:
+    global _engine, SessionLocal
     url = database_url or get_settings().database_url
-    _engine = create_async_engine(url, echo=False)
-    _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+    _engine = create_engine(url, echo=False)
+    SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
+    return SessionLocal
 
 
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    if _session_factory is None:
+def get_session() -> Generator[Session, None, None]:
+    if SessionLocal is None:
         init_engine()
-    assert _session_factory is not None
-    async with _session_factory() as session:
+    assert SessionLocal is not None
+    session = SessionLocal()
+    try:
         yield session
+    finally:
+        session.close()

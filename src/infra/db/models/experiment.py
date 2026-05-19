@@ -1,5 +1,6 @@
 """Experiment model — training run records & comparison."""
 
+import uuid
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, String, Text, Uuid
@@ -16,14 +17,14 @@ if TYPE_CHECKING:
 class Experiment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "experiments"
 
-    project_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    job_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("training_jobs.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

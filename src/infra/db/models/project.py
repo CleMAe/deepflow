@@ -1,5 +1,6 @@
 """Project model — top-level organization unit."""
 
+import uuid
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import ForeignKey, Integer, String, Text, Uuid
@@ -21,8 +22,8 @@ class Project(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
 
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    owner_id: Mapped[str] = mapped_column(
-        Uuid(as_uuid=False),
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
