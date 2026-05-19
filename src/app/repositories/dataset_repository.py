@@ -7,7 +7,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import DatasetRow
+from src.infra.db.models import Dataset, DatasetFormat, DatasetStatus
 
 _UPDATABLE_FIELDS = frozenset({"name", "format", "file_path", "num_samples", "columns_meta", "tags", "status"})
 
@@ -21,13 +21,13 @@ class DatasetRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def get_by_id(self, dataset_id: uuid.UUID) -> DatasetRow | None:
-        return self._db.get(DatasetRow, dataset_id)
+    def get_by_id(self, dataset_id: uuid.UUID) -> Dataset | None:
+        return self._db.get(Dataset, dataset_id)
 
-    def get_by_id_and_project(self, dataset_id: uuid.UUID, project_id: uuid.UUID) -> DatasetRow | None:
-        stmt = select(DatasetRow).where(
-            DatasetRow.id == dataset_id,
-            DatasetRow.project_id == project_id,
+    def get_by_id_and_project(self, dataset_id: uuid.UUID, project_id: uuid.UUID) -> Dataset | None:
+        stmt = select(Dataset).where(
+            Dataset.id == dataset_id,
+            Dataset.project_id == project_id,
         )
         return self._db.scalar(stmt)
 
@@ -40,23 +40,23 @@ class DatasetRepository:
         format_filter: str | None = None,
         status_filter: str | None = None,
         search: str | None = None,
-    ) -> tuple[list[DatasetRow], int]:
-        filters = [DatasetRow.project_id == project_id]
+    ) -> tuple[list[Dataset], int]:
+        filters = [Dataset.project_id == project_id]
         if format_filter:
-            filters.append(DatasetRow.format == format_filter)
+            filters.append(Dataset.format == DatasetFormat(format_filter))
         if status_filter:
-            filters.append(DatasetRow.status == status_filter)
+            filters.append(Dataset.status == DatasetStatus(status_filter))
         if search:
             escaped = _escape_like_pattern(search)
-            filters.append(DatasetRow.name.ilike(f"%{escaped}%", escape="\\"))
+            filters.append(Dataset.name.ilike(f"%{escaped}%", escape="\\"))
 
-        count_stmt = select(func.count()).select_from(DatasetRow).where(*filters)
+        count_stmt = select(func.count()).select_from(Dataset).where(*filters)
         total = int(self._db.scalar(count_stmt) or 0)
 
         stmt = (
-            select(DatasetRow)
+            select(Dataset)
             .where(*filters)
-            .order_by(DatasetRow.created_at.desc())
+            .order_by(Dataset.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -75,33 +75,39 @@ class DatasetRepository:
         columns_meta: list | dict | None = None,
         tags: list[str] | None = None,
         status: str = "uploading",
-    ) -> DatasetRow:
-        row = DatasetRow(
+    ) -> Dataset:
+        ds_format = format if isinstance(format, DatasetFormat) else DatasetFormat(format)
+        ds_status = status if isinstance(status, DatasetStatus) else DatasetStatus(status)
+        row = Dataset(
             id=dataset_id or uuid.uuid4(),
             project_id=project_id,
             name=name,
-            format=format,
+            format=ds_format,
             file_path=file_path,
             num_samples=num_samples,
-            columns_meta=columns_meta or [],
-            tags=tags or [],
-            status=status,
+            columns_meta=columns_meta,
+            tags=tags,
+            status=ds_status,
         )
         self._db.add(row)
         self._db.commit()
         self._db.refresh(row)
         return row
 
-    def update(self, row: DatasetRow, **fields) -> DatasetRow:
+    def update(self, row: Dataset, **fields) -> Dataset:
         for key, value in fields.items():
             if key not in _UPDATABLE_FIELDS:
                 continue
             if value is not None:
+                if key == "format":
+                    value = DatasetFormat(value)
+                elif key == "status":
+                    value = DatasetStatus(value)
                 setattr(row, key, value)
         self._db.commit()
         self._db.refresh(row)
         return row
 
-    def delete(self, row: DatasetRow) -> None:
+    def delete(self, row: Dataset) -> None:
         self._db.delete(row)
         self._db.commit()

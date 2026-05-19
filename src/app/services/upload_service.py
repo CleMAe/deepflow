@@ -119,8 +119,6 @@ class UploadService:
         upload_id: uuid.UUID,
         body: UploadCompleteRequest,
     ):
-        from app.db.models import DatasetRow  # noqa: WPS433
-
         state = self._get_session(upload_id)
         if state.project_id != project_id:
             raise AppError.forbidden("Upload session does not belong to this project")

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from app.core.errors import AppError
-from app.db.models import DatasetRow
+from src.infra.db.models import Dataset
 from app.mappers.dataset_mapper import file_size_if_exists, row_to_dataset_schema
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import (
@@ -23,7 +23,7 @@ class DatasetService:
         self._repo = repo
         self._storage = storage
 
-    def _require_row(self, project_id: uuid.UUID, dataset_id: uuid.UUID) -> DatasetRow:
+    def _require_row(self, project_id: uuid.UUID, dataset_id: uuid.UUID) -> Dataset:
         row = self._repo.get_by_id_and_project(dataset_id, project_id)
         if not row:
             raise AppError.not_found(
@@ -50,7 +50,7 @@ class DatasetService:
             status_filter=status_filter,
             search=search,
         )
-        items = [row_to_dataset_schema(r, size_bytes=file_size_if_exists(r.file_path)) for r in rows]
+        items = [row_to_dataset_schema(r, size_bytes=file_size_if_exists(r.file_path or "")) for r in rows]
         return PaginatedDatasets(page=page, page_size=page_size, total=total, items=items)
 
     def create(self, project_id: uuid.UUID, body: DatasetCreate) -> DatasetSchema:
@@ -68,7 +68,7 @@ class DatasetService:
 
     def get(self, project_id: uuid.UUID, dataset_id: uuid.UUID) -> DatasetSchema:
         row = self._require_row(project_id, dataset_id)
-        return row_to_dataset_schema(row, size_bytes=file_size_if_exists(row.file_path))
+        return row_to_dataset_schema(row, size_bytes=file_size_if_exists(row.file_path or ""))
 
     def update(self, project_id: uuid.UUID, dataset_id: uuid.UUID, body: DatasetUpdate) -> DatasetSchema:
         row = self._require_row(project_id, dataset_id)
@@ -81,7 +81,6 @@ class DatasetService:
 
     def preview(self, project_id: uuid.UUID, dataset_id: uuid.UUID, limit: int = 100) -> DatasetPreviewSchema:
         row = self._require_row(project_id, dataset_id)
-        # Day1 mock preview when file empty; Day2 parse via DataParserProtocol
         columns = ["col_a", "col_b"]
         rows = [{"col_a": 1, "col_b": 2}]
         if row.columns_meta:

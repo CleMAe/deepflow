@@ -22,6 +22,13 @@ def init_engine(database_url: Optional[str] = None) -> sessionmaker[Session]:
     return SessionLocal
 
 
+def get_engine():
+    global _engine
+    if _engine is None:
+        init_engine()
+    return _engine
+
+
 def get_session() -> Generator[Session, None, None]:
     if SessionLocal is None:
         init_engine()
