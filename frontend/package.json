@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "generate:types": "openapi-typescript ../docs/api/openapi.yaml -o src/api/types.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.10",
