@@ -6,10 +6,12 @@ import os
 import uuid
 from pathlib import Path
 
+from shared.protocols import StorageProtocol
+
 from app.core.config import settings
 
 
-class MockFileStorage:
+class MockFileStorage(StorageProtocol):
     """File-system storage; paths follow P6 layout under STORAGE_ROOT."""
 
     def __init__(self, root: str | None = None) -> None:

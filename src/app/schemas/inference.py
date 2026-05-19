@@ -17,8 +17,11 @@ class InferenceBatchRequest(BaseModel):
 
 
 class InferenceOnlineRequest(BaseModel):
+    """Matches openapi `OnlineInferenceRequest.input_data` (object | Base64 string)."""
+
     model_id: UUID
-    input_data: dict[str, Any]
+    input_data: dict[str, Any] | str
+    checkpoint_path: str | None = None
 
 
 class InferenceExportOnnxRequest(BaseModel):

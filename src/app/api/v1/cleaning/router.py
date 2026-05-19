@@ -13,7 +13,7 @@ from app.schemas.cleaning import (
 )
 from app.services.cleaning_mock import MockCleaningService
 
-router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}/clean", tags=["Datasets"])
+router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}/clean", tags=["Cleaning"])
 
 
 @router.post("/missing")

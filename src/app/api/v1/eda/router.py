@@ -7,7 +7,7 @@ from app.core.response import success
 from app.schemas.eda import AugmentRequest, EdaRequest, SplitRequest, SplitResultSchema
 from app.services.dataset_service import DatasetService
 
-router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}", tags=["Datasets"])
+router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}", tags=["Cleaning"])
 
 
 @router.post("/eda")

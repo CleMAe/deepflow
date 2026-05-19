@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.errors import AppError, ERR_UPLOAD_INCOMPLETE, ERR_UPLOAD_NOT_FOUND
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import UploadCompleteRequest, UploadInitRequest, UploadSessionSchema
-from app.services.storage_mock import MockFileStorage
+from shared.protocols import StorageProtocol
 
 
 @dataclass
@@ -29,7 +29,7 @@ class _UploadState:
 
 
 class UploadService:
-    def __init__(self, storage: MockFileStorage, repo: DatasetRepository) -> None:
+    def __init__(self, storage: StorageProtocol, repo: DatasetRepository) -> None:
         self._storage = storage
         self._repo = repo
         self._sessions: dict[uuid.UUID, _UploadState] = {}

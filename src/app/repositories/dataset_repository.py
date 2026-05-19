@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import DatasetRow
+
+_UPDATABLE_FIELDS = frozenset({"name", "format", "file_path", "num_samples", "columns_meta", "tags", "status"})
+
+
+def _escape_like_pattern(value: str) -> str:
+    """Escape SQL LIKE wildcards in user-provided search text."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class DatasetRepository:
@@ -41,7 +47,8 @@ class DatasetRepository:
         if status_filter:
             filters.append(DatasetRow.status == status_filter)
         if search:
-            filters.append(DatasetRow.name.ilike(f"%{search}%"))
+            escaped = _escape_like_pattern(search)
+            filters.append(DatasetRow.name.ilike(f"%{escaped}%", escape="\\"))
 
         count_stmt = select(func.count()).select_from(DatasetRow).where(*filters)
         total = int(self._db.scalar(count_stmt) or 0)
@@ -87,7 +94,9 @@ class DatasetRepository:
 
     def update(self, row: DatasetRow, **fields) -> DatasetRow:
         for key, value in fields.items():
-            if value is not None and hasattr(row, key):
+            if key not in _UPDATABLE_FIELDS:
+                continue
+            if value is not None:
                 setattr(row, key, value)
         self._db.commit()
         self._db.refresh(row)

@@ -15,11 +15,11 @@ from app.schemas.dataset import (
     PaginatedDatasets,
     PaginatedImages,
 )
-from app.services.storage_mock import MockFileStorage
+from shared.protocols import StorageProtocol
 
 
 class DatasetService:
-    def __init__(self, repo: DatasetRepository, storage: MockFileStorage) -> None:
+    def __init__(self, repo: DatasetRepository, storage: StorageProtocol) -> None:
         self._repo = repo
         self._storage = storage
 

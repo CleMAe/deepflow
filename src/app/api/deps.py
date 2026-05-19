@@ -6,8 +6,9 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -23,7 +24,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 @lru_cache
-def get_storage() -> MockFileStorage:
+def get_storage() -> StorageProtocol:
     """Replace with P6 `RealFileStorage` at Day3 integration."""
     return MockFileStorage()
 
@@ -34,13 +35,13 @@ def get_dataset_repo(db: Session = Depends(get_db)) -> DatasetRepository:
 
 def get_dataset_service(
     repo: DatasetRepository = Depends(get_dataset_repo),
-    storage: MockFileStorage = Depends(get_storage),
+    storage: StorageProtocol = Depends(get_storage),
 ) -> DatasetService:
     return DatasetService(repo, storage)
 
 
 def get_upload_service(
-    storage: MockFileStorage = Depends(get_storage),
+    storage: StorageProtocol = Depends(get_storage),
     repo: DatasetRepository = Depends(get_dataset_repo),
 ) -> UploadService:
     return UploadService(storage, repo)
@@ -48,7 +49,7 @@ def get_upload_service(
 
 def get_cleaning_service(
     repo: DatasetRepository = Depends(get_dataset_repo),
-    storage: MockFileStorage = Depends(get_storage),
+    storage: StorageProtocol = Depends(get_storage),
     datasets: DatasetService = Depends(get_dataset_service),
 ) -> MockCleaningService:
     return MockCleaningService(repo, storage, datasets)

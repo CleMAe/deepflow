@@ -7,14 +7,14 @@ import uuid
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.cleaning import CleaningResultSchema
 from app.services.dataset_service import DatasetService
-from app.services.storage_mock import MockFileStorage
+from shared.protocols import StorageProtocol
 
 
 class MockCleaningService:
     def __init__(
         self,
         repo: DatasetRepository,
-        storage: MockFileStorage,
+        storage: StorageProtocol,
         datasets: DatasetService,
     ) -> None:
         self._repo = repo

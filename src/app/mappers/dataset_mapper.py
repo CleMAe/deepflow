@@ -39,7 +39,7 @@ def row_to_dataset_schema(row: DatasetRow, *, size_bytes: int | None = None) -> 
         status=row.status,  # type: ignore[arg-type]
         size_bytes=size_bytes,
         created_at=row.created_at,
-        updated_at=row.created_at,
+        updated_at=None,
     )
 
 

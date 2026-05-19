@@ -1,7 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.core.paths import setup_protocol_path
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -16,5 +14,4 @@ class Settings(BaseSettings):
     default_chunk_size: int = 5 * 1024 * 1024
 
 
-setup_protocol_path()
 settings = Settings()
