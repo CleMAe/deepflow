@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Form, Input, Button, Card, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import api from '@/lib/axios'
+import api, { type ApiResponse } from '@/lib/axios'
 import { useUserStore } from '@/stores/userStore'
 import type { components } from '@/api/types'
 
@@ -16,9 +16,12 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await api.post('/auth/login', values)
-      const typedRes = res as unknown as TokenPair
-      setToken(typedRes.access_token || null)
-      localStorage.setItem('refresh_token', typedRes.refresh_token || '')
+      const tokenPair = (res as ApiResponse<TokenPair>).data
+      if (!tokenPair?.access_token) {
+        throw new Error('invalid token response')
+      }
+      setToken(tokenPair.access_token)
+      localStorage.setItem('refresh_token', tokenPair.refresh_token || '')
       message.success('登录成功')
       navigate('/dashboard')
     } catch {
