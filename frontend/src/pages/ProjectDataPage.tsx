@@ -14,7 +14,7 @@ export default function ProjectDataPage() {
     queryKey: ['datasets', projectId],
     queryFn: async () => {
       const res = await api.get(`/projects/${projectId}/datasets`)
-      return (res as { data: PaginatedDatasets }).data
+      return (res as unknown as PaginatedDatasets)
     },
     enabled: !!projectId,
   })

@@ -46,7 +46,13 @@ export default function FileUpload({ action, multiple = false, accept, onSuccess
         </p>
         <p>点击或拖拽文件到此处上传</p>
       </Upload.Dragger>
-      {uploading && <Progress percent={50} status="active" style={{ marginTop: 16 }} />}
+      {uploading && fileList.length > 0 && (
+        <Progress
+          percent={Math.round(fileList[fileList.length - 1].percent || 0)}
+          status="active"
+          style={{ marginTop: 16 }}
+        />
+      )}
     </div>
   )
 }

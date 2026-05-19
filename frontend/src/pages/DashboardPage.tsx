@@ -17,7 +17,7 @@ export default function DashboardPage() {
     queryKey: ['projects'],
     queryFn: async () => {
       const res = await api.get('/projects')
-      return (res as { data: PaginatedProjects }).data
+      return (res as unknown as PaginatedProjects)
     },
   })
 
