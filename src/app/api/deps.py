@@ -12,9 +12,10 @@ from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import ERR_AUTH_INVALID, AppError
+from app.core.errors import ERR_AUTH_INVALID, ERR_PROJECT_FORBIDDEN, ERR_PROJECT_NOT_FOUND, AppError
 from app.core.security import decode_token
 from app.db.session import get_db
+from src.infra.db.models.project import Project
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
 from app.services.dataset_service import DatasetService
@@ -81,7 +82,12 @@ async def get_current_user_id(
 async def require_project_access(
     project_id: UUID,
     user_id: Annotated[UUID, Depends(get_current_user_id)],
+    db: Session = Depends(get_db),
 ) -> UUID:
-    """P6 RBAC placeholder — Day3 check project membership."""
-    _ = user_id
+    """Ensure the current user owns the project (RBAC)."""
+    project = db.get(Project, project_id)
+    if project is None:
+        raise AppError.not_found("Project not found", code=ERR_PROJECT_NOT_FOUND)
+    if project.owner_id != user_id:
+        raise AppError.forbidden("No access to this project", code=ERR_PROJECT_FORBIDDEN)
     return project_id

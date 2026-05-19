@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
 from app.api.deps import (
     get_dataset_service,
@@ -77,7 +77,7 @@ async def list_datasets(
     return success(payload.model_dump(mode="json"))
 
 
-@router.post("")
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     project_id: UUID,
     body: DatasetCreate,

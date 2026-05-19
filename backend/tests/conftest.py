@@ -36,6 +36,7 @@ from src.infra.db.base import Base as InfraBase  # noqa: E402
 import src.infra.db.models  # noqa: F401, E402 — register ORM metadata
 
 from tests.factories.base import TestRecordFactory
+from tests.factories.dataset import DatasetFactory
 from tests.factories.project import ProjectFactory
 from tests.factories.user import UserFactory
 from tests.support.models import Base as TestBase
@@ -104,6 +105,7 @@ def db_session(engine: Engine) -> Generator[Session, None, None]:
     TestRecordFactory._meta.sqlalchemy_session = session  # noqa: SLF001
     UserFactory._meta.sqlalchemy_session = session  # noqa: SLF001
     ProjectFactory._meta.sqlalchemy_session = session  # noqa: SLF001
+    DatasetFactory._meta.sqlalchemy_session = session  # noqa: SLF001
 
     try:
         yield session
@@ -111,6 +113,7 @@ def db_session(engine: Engine) -> Generator[Session, None, None]:
         TestRecordFactory._meta.sqlalchemy_session = None  # noqa: SLF001
         UserFactory._meta.sqlalchemy_session = None  # noqa: SLF001
         ProjectFactory._meta.sqlalchemy_session = None  # noqa: SLF001
+        DatasetFactory._meta.sqlalchemy_session = None  # noqa: SLF001
         session.close()
         outer.rollback()
         connection.close()
@@ -124,6 +127,11 @@ def user_factory(db_session: Session) -> type[UserFactory]:
 @pytest.fixture
 def project_factory(db_session: Session) -> type[ProjectFactory]:
     return ProjectFactory
+
+
+@pytest.fixture
+def dataset_factory(db_session: Session) -> type[DatasetFactory]:
+    return DatasetFactory
 
 
 @pytest.fixture
