@@ -1,5 +1,6 @@
 # DeepFlow CI — Day 2 (P9)
-# Pipeline: lint → unit-test (FE Vitest) → integration-test (BE pytest) → build-docker
+# Pipeline: lint → unit-test (FE, optional) + integration-test (BE) → build-docker
+# Frontend steps run only when frontend/package.json exists; backend always runs.
 
 name: CI
 
@@ -25,7 +26,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ─── Frontend (optional) ───────────────────────────────────
       - name: Set up Node.js
+        if: hashFiles('frontend/package.json') != ''
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -33,13 +36,25 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
+        if: hashFiles('frontend/package.json') != ''
         working-directory: frontend
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Frontend ESLint
+        if: hashFiles('frontend/package.json') != ''
         working-directory: frontend
         run: npm run lint
 
+      - name: Skip frontend lint (no package.json)
+        if: hashFiles('frontend/package.json') == ''
+        run: echo "frontend/package.json not found — skipping FE lint"
+
+      # ─── Backend (always) ──────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -54,14 +69,14 @@ jobs:
 
       - name: Backend static checks
         run: |
-          # 仅语法/未定义名等关键项，避免 Day 2 因存量风格问题阻断流水线
-          ruff check src backend --select E9,F63,F7,F82
+          ruff check src backend
           python -m compileall -q src backend
 
   unit-test:
     name: unit-test
     runs-on: ubuntu-latest
     needs: lint
+    if: hashFiles('frontend/package.json') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +90,12 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Frontend unit tests (Vitest)
         working-directory: frontend
@@ -84,7 +104,7 @@ jobs:
   integration-test:
     name: integration-test
     runs-on: ubuntu-latest
-    needs: unit-test
+    needs: lint
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -111,7 +131,7 @@ jobs:
   build-docker:
     name: build-docker
     runs-on: ubuntu-latest
-    needs: integration-test
+    needs: [lint, integration-test]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -134,6 +154,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build frontend image (no push)
+        if: hashFiles('frontend/package.json') != '' && hashFiles('docker/frontend/Dockerfile') != ''
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -145,4 +166,8 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify images loaded
-        run: docker image inspect deepflow-backend:ci deepflow-frontend:ci
+        run: |
+          docker image inspect deepflow-backend:ci
+          if [ -f frontend/package.json ] && [ -f docker/frontend/Dockerfile ]; then
+            docker image inspect deepflow-frontend:ci
+          fi
