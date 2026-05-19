@@ -102,8 +102,9 @@ jobs:
       - name: Backend integration tests (pytest + SQLite in-memory)
         working-directory: backend
         env:
-          # Day 1 conftest 使用内存 SQLite；预留变量供后续接入 FastAPI / DB 时使用
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: sqlite://
+          DEV_ALLOW_ANONYMOUS: "false"
+          JWT_SECRET_KEY: ci-test-jwt-secret-key-32chars-minimum
           DEEPFLOW_TESTING: "1"
         run: pytest -m "not integration and not gpu"
 

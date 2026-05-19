@@ -19,9 +19,10 @@ ERR_UPLOAD_NOT_FOUND = error_code(30, 2, 2)
 ERR_UPLOAD_INCOMPLETE = error_code(30, 4, 1)
 ERR_PROJECT_FORBIDDEN = error_code(30, 3, 1)
 
-# Auth (10) — used when dev_allow_anonymous is False
+# Auth (10)
 ERR_AUTH_MISSING = error_code(10, 3, 1)
 ERR_AUTH_INVALID = error_code(10, 3, 2)
+ERR_AUTH_DUPLICATE_USER = error_code(10, 4, 1)
 
 
 @dataclass

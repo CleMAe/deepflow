@@ -12,7 +12,8 @@ from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import AppError
+from app.core.errors import ERR_AUTH_INVALID, AppError
+from app.core.security import decode_token
 from app.db.session import get_db
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
@@ -55,16 +56,26 @@ def get_cleaning_service(
     return MockCleaningService(repo, storage, datasets)
 
 
-async def get_current_user_id(
+async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UUID:
-    """P6 `AuthProtocol` placeholder — rejects missing token when anonymous dev mode is off."""
+    """Decode JWT access token and return current user id."""
     if settings.dev_allow_anonymous:
         return UUID("00000000-0000-0000-0000-000000000001")
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AppError.unauthorized("Missing or invalid Authorization header")
-    # Day3: decode JWT via P6
-    return UUID("00000000-0000-0000-0000-000000000001")
+    try:
+        payload = decode_token(credentials.credentials, expected_type="access")
+    except ValueError as exc:
+        raise AppError.unauthorized("Invalid or expired token", code=ERR_AUTH_INVALID) from exc
+    return UUID(str(payload["sub"]))
+
+
+async def get_current_user_id(
+    user_id: Annotated[UUID, Depends(get_current_user)],
+) -> UUID:
+    """Alias kept for existing dataset routes."""
+    return user_id
 
 
 async def require_project_access(
