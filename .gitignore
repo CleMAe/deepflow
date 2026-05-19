@@ -41,3 +41,12 @@ postgres_data/
 
 # Uploads temp
 uploads/
+.venv/
+storage/
+__pycache__/
+*.py[cod]
+*.db
+.env
+.pytest_cache/
+.coverage
+htmlcov/
