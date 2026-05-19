@@ -73,10 +73,10 @@
      - Agent 工具绑定
    - 更新 `frontend/src/mocks/browser.ts` 注册 Agent handlers。
 
-6. Axios 响应解包修复
-   - 更新 `frontend/src/lib/axios.ts`。
-   - 统一将 OpenAPI 标准响应 `{ code, message, data }` 解包为业务 `data`。
-   - 修复 Mock 场景下登录、项目列表、模型列表、数据集列表等页面拿不到内层数据的问题。
+6. P5 API 响应解包
+   - 保持 `frontend/src/lib/axios.ts` 与主分支一致，不改变全局拦截器行为。
+   - 在 `frontend/src/api/inference.ts` 和 `frontend/src/api/agents.ts` 内部解包 OpenAPI 标准响应 `{ code, message, data }`。
+   - 避免影响登录、项目列表、数据集列表等已有页面的数据访问约定。
 
 ## 契约对齐
 

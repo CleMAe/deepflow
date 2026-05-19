@@ -1,4 +1,4 @@
-import api from '@/lib/axios'
+import api, { type ApiResponse } from '@/lib/axios'
 import type { components } from '@/api/types'
 
 export type Agent = components['schemas']['Agent']
@@ -8,19 +8,23 @@ export type AgentUpdate = components['schemas']['AgentUpdate']
 export type PaginatedAgents = components['schemas']['PaginatedAgents']
 export type ToolBindRequest = components['schemas']['ToolBindRequest']
 
+function unwrapApiData<T>(res: unknown) {
+  return (res as ApiResponse<T>).data
+}
+
 export async function listAgents(projectId: string) {
   const res = await api.get(`/projects/${projectId}/agents`)
-  return res as unknown as PaginatedAgents
+  return unwrapApiData<PaginatedAgents>(res)
 }
 
 export async function createAgent(projectId: string, payload: AgentCreate) {
   const res = await api.post(`/projects/${projectId}/agents`, payload)
-  return res as unknown as Agent
+  return unwrapApiData<Agent>(res)
 }
 
 export async function updateAgent(projectId: string, agentId: string, payload: AgentUpdate) {
   const res = await api.put(`/projects/${projectId}/agents/${agentId}`, payload)
-  return res as unknown as Agent
+  return unwrapApiData<Agent>(res)
 }
 
 export async function deleteAgent(projectId: string, agentId: string) {
@@ -29,10 +33,10 @@ export async function deleteAgent(projectId: string, agentId: string) {
 
 export async function bindAgentTools(projectId: string, agentId: string, payload: ToolBindRequest) {
   const res = await api.post(`/projects/${projectId}/agents/${agentId}/tools/bind`, payload)
-  return res as unknown as AgentTool
+  return unwrapApiData<AgentTool>(res)
 }
 
 export async function listAgentTools(projectId: string, agentId: string) {
   const res = await api.get(`/projects/${projectId}/agents/${agentId}/tools`)
-  return res as unknown as AgentTool[]
+  return unwrapApiData<AgentTool[]>(res)
 }
