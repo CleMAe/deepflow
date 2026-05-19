@@ -20,7 +20,13 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const body = response.data
+    if (body && typeof body === 'object' && 'data' in body) {
+      return (body as { data: unknown }).data
+    }
+    return body
+  },
   async (error) => {
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {

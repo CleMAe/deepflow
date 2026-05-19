@@ -1,8 +1,11 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/api/types'
 
+type BatchInferenceRequest = components['schemas']['BatchInferenceRequest']
 type EvaluateRequest = components['schemas']['EvaluateRequest']
+type InferenceTask = components['schemas']['InferenceTask']
 type OnlineInferenceRequest = components['schemas']['OnlineInferenceRequest']
+type MockInferenceTask = InferenceTask & { polls: number; output_format: BatchInferenceRequest['output_format'] }
 
 const mockModels = [
   {
@@ -36,6 +39,39 @@ const mockModels = [
     updated_at: '2026-05-18T12:30:00Z',
   },
 ]
+
+const mockBatchTasks = new Map<string, MockInferenceTask>()
+
+function toResponseTask(task: MockInferenceTask): InferenceTask {
+  return {
+    task_id: task.task_id,
+    model_id: task.model_id,
+    dataset_id: task.dataset_id,
+    status: task.status,
+    progress: task.progress,
+    result_path: task.result_path,
+    predictions: task.predictions,
+    created_at: task.created_at,
+    finished_at: task.finished_at,
+  }
+}
+
+function buildMockPredictions(modelId?: string) {
+  const imagePredictions = [
+    { input: 'images/item_0001.jpg', prediction: '正常', confidence: 0.938 },
+    { input: 'images/item_0002.jpg', prediction: '轻微异常', confidence: 0.874 },
+    { input: 'images/item_0003.jpg', prediction: '正常', confidence: 0.911 },
+    { input: 'images/item_0004.jpg', prediction: '严重异常', confidence: 0.816 },
+  ]
+  const tablePredictions = [
+    { input: { row_id: 101, visits_30d: 18 }, prediction: 'high_value_customer', confidence: 0.921 },
+    { input: { row_id: 102, visits_30d: 7 }, prediction: 'mid_value_customer', confidence: 0.783 },
+    { input: { row_id: 103, visits_30d: 2 }, prediction: 'low_value_customer', confidence: 0.854 },
+    { input: { row_id: 104, visits_30d: 13 }, prediction: 'high_value_customer', confidence: 0.889 },
+  ]
+
+  return modelId === 'model-1' ? imagePredictions : tablePredictions
+}
 
 export const inferenceHandlers = [
   http.get('/api/v1/projects/:projectId/models', ({ params }) => {
@@ -81,6 +117,70 @@ export const inferenceHandlers = [
         num_samples: 150,
       },
       request_id: 'mock-p5-evaluate',
+    })
+  }),
+
+  http.post('/api/v1/projects/:projectId/inference/batch', async ({ request, params }) => {
+    const payload = (await request.json()) as BatchInferenceRequest
+    const taskId = `task-${Date.now()}`
+    const createdAt = new Date().toISOString()
+    const task: MockInferenceTask = {
+      task_id: taskId,
+      model_id: payload.model_id,
+      dataset_id: payload.dataset_id,
+      status: 'running',
+      progress: 36,
+      result_path: `/projects/${params.projectId}/inference/${taskId}/predictions.${payload.output_format}`,
+      predictions: [],
+      created_at: createdAt,
+      polls: 0,
+      output_format: payload.output_format,
+    }
+
+    mockBatchTasks.set(taskId, task)
+
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: toResponseTask(task),
+      request_id: 'mock-p5-batch-start',
+    })
+  }),
+
+  http.get('/api/v1/projects/:projectId/inference/:taskId', ({ params }) => {
+    const taskId = String(params.taskId)
+    const task = mockBatchTasks.get(taskId)
+
+    if (!task) {
+      return HttpResponse.json(
+        {
+          code: '60-04-001',
+          message: 'inference task not found',
+          data: null,
+          request_id: 'mock-p5-batch-missing',
+        },
+        { status: 404 }
+      )
+    }
+
+    const nextPolls = task.polls + 1
+    const nextProgress = Math.min(100, (task.progress ?? 0) + 32)
+    const nextTask: MockInferenceTask = {
+      ...task,
+      polls: nextPolls,
+      progress: nextProgress,
+      status: nextProgress >= 100 ? 'success' : 'running',
+      predictions: nextProgress >= 100 ? buildMockPredictions(task.model_id) : task.predictions,
+      finished_at: nextProgress >= 100 ? new Date().toISOString() : undefined,
+    }
+
+    mockBatchTasks.set(taskId, nextTask)
+
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: toResponseTask(nextTask),
+      request_id: 'mock-p5-batch-result',
     })
   }),
 
