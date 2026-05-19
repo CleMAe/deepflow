@@ -1,3 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Database (local dev)
+*.db
+deepflow.db
+
+# Data & storage (local dev)
+data/
+storage/
+
+# Docker volumes (local)
+postgres_data/
+
+# Uploads temp
+uploads/
 .venv/
 storage/
 __pycache__/
