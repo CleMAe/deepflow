@@ -8,13 +8,13 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.response import success
 from app.db.seed import seed_demo_datasets
-from app.db.session import SessionLocal, init_db
+from app.db.session import get_db, init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    db = SessionLocal()
+    db = next(get_db())
     try:
         seed_demo_datasets(db)
     finally:

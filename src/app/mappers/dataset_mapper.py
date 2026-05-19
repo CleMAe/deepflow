@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from app.db.models import DatasetRow
+from src.infra.db.models import Dataset
+
 from app.schemas.dataset import ColumnMetaSchema, DatasetSchema
 
 
@@ -24,22 +25,22 @@ def _normalize_columns_meta(raw: list | dict | None) -> list[ColumnMetaSchema]:
     return result
 
 
-def row_to_dataset_schema(row: DatasetRow, *, size_bytes: int | None = None) -> DatasetSchema:
+def row_to_dataset_schema(row: Dataset, *, size_bytes: int | None = None) -> DatasetSchema:
     columns = _normalize_columns_meta(row.columns_meta)
     return DatasetSchema(
         id=row.id,
         project_id=row.project_id,
         name=row.name,
-        format=row.format,  # type: ignore[arg-type]
-        file_path=row.file_path,
+        format=row.format.value,
+        file_path=row.file_path or "",
         num_samples=row.num_samples,
-        num_columns=len(columns),
+        num_columns=row.num_columns or len(columns),
         columns_meta=columns,
         tags=list(row.tags or []),
-        status=row.status,  # type: ignore[arg-type]
-        size_bytes=size_bytes,
+        status=row.status.value,
+        size_bytes=size_bytes if size_bytes is not None else row.size_bytes,
         created_at=row.created_at,
-        updated_at=None,
+        updated_at=row.updated_at,
     )
 
 
