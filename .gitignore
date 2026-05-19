@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Database (local dev)
+*.db
+deepflow.db
+
+# IDE
+.idea/
+.vscode/
