@@ -1,4 +1,4 @@
-import api, { type ApiResponse } from '@/lib/axios'
+import api from '@/lib/axios'
 import type { components } from '@/api/types'
 
 export type Dataset = components['schemas']['Dataset']
@@ -12,20 +12,20 @@ export type PaginatedModels = components['schemas']['PaginatedModels']
 
 export async function listInferenceDatasets(projectId: string) {
   const res = await api.get(`/projects/${projectId}/datasets`)
-  return (res as unknown as ApiResponse<PaginatedDatasets>).data
+  return res as unknown as PaginatedDatasets
 }
 
 export async function listInferenceModels(projectId: string) {
   const res = await api.get(`/projects/${projectId}/models`)
-  return (res as unknown as ApiResponse<PaginatedModels>).data
+  return res as unknown as PaginatedModels
 }
 
 export async function evaluateModel(projectId: string, payload: EvaluateRequest) {
   const res = await api.post(`/projects/${projectId}/inference/evaluate`, payload)
-  return (res as unknown as ApiResponse<EvaluateResult>).data
+  return res as unknown as EvaluateResult
 }
 
 export async function runOnlineInference(projectId: string, payload: OnlineInferenceRequest) {
   const res = await api.post(`/projects/${projectId}/inference/online`, payload)
-  return (res as unknown as ApiResponse<OnlineInferenceResult>).data
+  return res as unknown as OnlineInferenceResult
 }
