@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import ReactECharts from 'echarts-for-react'
+import { lazy, useMemo, useState, Suspense } from 'react'
+const ReactECharts = lazy(() => import('echarts-for-react'))
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import {
@@ -312,7 +312,9 @@ export default function ProjectInferencePage() {
         <>
           <MetricCards result={evaluationResult} />
           <Card title="混淆矩阵">
-            <ReactECharts option={buildConfusionMatrixOption(evaluationResult)} style={{ height: 360 }} />
+            <Suspense fallback={<div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>加载图表...</div>}>
+              <ReactECharts option={buildConfusionMatrixOption(evaluationResult)} style={{ height: 360 }} />
+            </Suspense>
           </Card>
         </>
       ) : (
