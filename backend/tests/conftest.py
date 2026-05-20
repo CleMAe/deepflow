@@ -81,10 +81,6 @@ def _test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
     get_settings.cache_clear()
 
-    from app.core import config
-
-    config.settings = config.Settings()
-
 
 @pytest.fixture(scope="session")
 def engine() -> Generator[Engine, None, None]:
@@ -155,6 +151,8 @@ def api_client(db_session: Session, _test_env: None) -> Generator[TestClient, No
     # Fallback for routers without lifespan_context (legacy Starlette startup hooks)
     with (
         patch("app.main.init_db"),
+        patch("app.main.seed_demo_user"),
+        patch("app.main.seed_demo_project"),
         patch("app.main.seed_demo_datasets"),
     ):
         try:

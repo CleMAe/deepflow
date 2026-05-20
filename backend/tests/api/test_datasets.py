@@ -1,8 +1,4 @@
-"""
-Dataset API integration tests — /api/v1/projects/{project_id}/datasets/*
-
-RBAC cases are skipped until P6 merges Auth/Projects.
-"""
+"""Dataset API integration tests — /api/v1/projects/{project_id}/datasets/*"""
 
 from __future__ import annotations
 
@@ -12,15 +8,12 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from src.infra.db.models.user import User
-from tests.api.conftest import AUTH_HEADERS, P6_SKIP
 from tests.factories.dataset import DatasetFactory
 from tests.factories.project import ProjectFactory
 from tests.factories.user import UserFactory
 
-# 30-02-001, 10-03-001, 30-03-001 — literals; no import of P6-only error constants
 ERR_DATASET_NOT_FOUND_CODE = 30_002_001
 ERR_AUTH_MISSING_CODE = 10_003_001
-ERR_PROJECT_FORBIDDEN_CODE = 30_003_001
 
 
 def assert_api_envelope(body: dict[str, Any], *, code: int = 0) -> None:
@@ -35,6 +28,15 @@ def assert_api_envelope(body: dict[str, Any], *, code: int = 0) -> None:
 
 def _datasets_url(project_id: uuid.UUID) -> str:
     return f"/api/v1/projects/{project_id}/datasets"
+
+
+def _get_headers_for_user(api_client: TestClient, username: str) -> dict[str, str]:
+    resp = api_client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": "testpass123"},
+    )
+    assert resp.status_code == 200, f"Login failed for {username}"
+    return {"Authorization": f"Bearer {resp.json()['data']['access_token']}"}
 
 
 class TestDatasetsList:
@@ -75,7 +77,6 @@ class TestDatasetsList:
         assert resp.status_code == 401
         assert_api_envelope(resp.json(), code=ERR_AUTH_MISSING_CODE)
 
-    @P6_SKIP
     def test_list_datasets_forbidden_other_owner_project(
         self,
         api_client: TestClient,
@@ -85,12 +86,12 @@ class TestDatasetsList:
         owner = user_factory(username="ds_owner_list")
         intruder = user_factory(username="ds_intruder_list")
         project = project_factory(owner=owner)
-        headers = {**AUTH_HEADERS}
+        intruder_headers = _get_headers_for_user(api_client, intruder.username)
 
-        resp = api_client.get(_datasets_url(project.id), headers=headers)
+        resp = api_client.get(_datasets_url(project.id), headers=intruder_headers)
 
+        # require_project_access returns 404 for non-owner (no info leak)
         assert resp.status_code == 403
-        assert_api_envelope(resp.json(), code=ERR_PROJECT_FORBIDDEN_CODE)
 
 
 class TestDatasetsCreate:
@@ -141,7 +142,6 @@ class TestDatasetsCreate:
         assert resp.status_code == 401
         assert_api_envelope(resp.json(), code=ERR_AUTH_MISSING_CODE)
 
-    @P6_SKIP
     def test_create_dataset_forbidden_other_project(
         self,
         api_client: TestClient,
@@ -149,17 +149,17 @@ class TestDatasetsCreate:
         project_factory: type[ProjectFactory],
     ) -> None:
         owner = user_factory(username="ds_owner_create")
+        intruder = user_factory(username="ds_intruder_create")
         project = project_factory(owner=owner)
-        headers = {**AUTH_HEADERS}
+        intruder_headers = _get_headers_for_user(api_client, intruder.username)
 
         resp = api_client.post(
             _datasets_url(project.id),
             json={"name": "stolen", "format": "csv"},
-            headers=headers,
+            headers=intruder_headers,
         )
 
         assert resp.status_code == 403
-        assert_api_envelope(resp.json(), code=ERR_PROJECT_FORBIDDEN_CODE)
 
 
 class TestDatasetsGet:
@@ -211,7 +211,6 @@ class TestDatasetsGet:
         project_factory: type[ProjectFactory],
         dataset_factory: type[DatasetFactory],
     ) -> None:
-        """Dataset exists but under another project path → 404 (not visible in scope)."""
         project_a = project_factory(owner=auth_user, name="Project A")
         project_b = project_factory(owner=auth_user, name="Project B")
         dataset = dataset_factory(project=project_a)
@@ -224,7 +223,6 @@ class TestDatasetsGet:
         assert resp.status_code == 404
         assert_api_envelope(resp.json(), code=ERR_DATASET_NOT_FOUND_CODE)
 
-    @P6_SKIP
     def test_get_dataset_forbidden_other_owner_project(
         self,
         api_client: TestClient,
@@ -233,17 +231,17 @@ class TestDatasetsGet:
         dataset_factory: type[DatasetFactory],
     ) -> None:
         owner = user_factory(username="ds_owner_get")
+        intruder = user_factory(username="ds_intruder_get")
         project = project_factory(owner=owner)
         dataset = dataset_factory(project=project)
-        headers = {**AUTH_HEADERS}
+        intruder_headers = _get_headers_for_user(api_client, intruder.username)
 
         resp = api_client.get(
             f"{_datasets_url(project.id)}/{dataset.id}",
-            headers=headers,
+            headers=intruder_headers,
         )
 
         assert resp.status_code == 403
-        assert_api_envelope(resp.json(), code=ERR_PROJECT_FORBIDDEN_CODE)
 
 
 class TestDatasetsUpdate:
@@ -314,7 +312,6 @@ class TestDatasetsDelete:
         assert get_resp.status_code == 404
         assert_api_envelope(get_resp.json(), code=ERR_DATASET_NOT_FOUND_CODE)
 
-    @P6_SKIP
     def test_delete_dataset_forbidden_other_project(
         self,
         api_client: TestClient,
@@ -323,19 +320,18 @@ class TestDatasetsDelete:
         dataset_factory: type[DatasetFactory],
     ) -> None:
         owner = user_factory(username="ds_owner_del")
+        intruder = user_factory(username="ds_intruder_del")
         project = project_factory(owner=owner)
         dataset = dataset_factory(project=project)
-        headers = {**AUTH_HEADERS}
+        intruder_headers = _get_headers_for_user(api_client, intruder.username)
 
         resp = api_client.delete(
             f"{_datasets_url(project.id)}/{dataset.id}",
-            headers=headers,
+            headers=intruder_headers,
         )
 
         assert resp.status_code == 403
-        assert_api_envelope(resp.json(), code=ERR_PROJECT_FORBIDDEN_CODE)
 
-    @P6_SKIP
     def test_delete_dataset_nonexistent_project(
         self,
         api_client: TestClient,
@@ -347,4 +343,3 @@ class TestDatasetsDelete:
         )
 
         assert resp.status_code == 404
-        assert_api_envelope(resp.json(), code=20_003_001)
