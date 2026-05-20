@@ -12,10 +12,12 @@ This module lives at the Service layer. It wires together:
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import logging
+from contextlib import asynccontextmanager, closing
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
@@ -25,16 +27,27 @@ from app.core.errors import ERR_SYSTEM_DB_UNAVAILABLE
 from app.core.response import failure, success
 from app.db.seed import seed_demo_datasets
 from app.db.session import get_db, init_db
+from src.infra.config import DEFAULT_JWT_SECRET_KEY
+
+logger = logging.getLogger(__name__)
+
+
+def warn_if_insecure_jwt_secret() -> None:
+    database_url = settings.database_url.lower()
+    if "sqlite" not in database_url and settings.jwt_secret_key == DEFAULT_JWT_SECRET_KEY:
+        logger.warning(
+            "JWT secret key is still using the development default while DATABASE_URL is not SQLite; "
+            "set JWT_SECRET_KEY or JWT_SECRET before production/integration startup."
+        )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_if_insecure_jwt_secret()
     init_db()
-    db = next(get_db())
-    try:
+    with closing(get_db()) as db_gen:
+        db = next(db_gen)
         seed_demo_datasets(db)
-    finally:
-        db.close()
     yield
 
 
@@ -56,7 +69,7 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
+@app.get("/api/v1/health")
 async def health():
     """Health check with database connectivity verification.
 
@@ -66,13 +79,11 @@ async def health():
     """
     db_status = "disconnected"
     try:
-        db = next(get_db())
-        try:
+        with closing(get_db()) as db_gen:
+            db = next(db_gen)
             db.execute(text("SELECT 1"))
             db.commit()
             db_status = "connected"
-        finally:
-            db.close()
     except Exception:
         db_status = "disconnected"
 
@@ -85,7 +96,8 @@ async def health():
     }
 
     if db_status != "connected":
-        return failure(code=ERR_SYSTEM_DB_UNAVAILABLE, message="Database unavailable", data=response_data)
+        body = failure(code=ERR_SYSTEM_DB_UNAVAILABLE, message="Database unavailable", data=response_data)
+        return JSONResponse(status_code=503, content=body)
 
     return success(response_data)
 

@@ -61,7 +61,7 @@
 | 文件 | 说明 |
 |------|------|
 | `docker/backend/Dockerfile` | FastAPI 占位镜像 |
-| `docker/backend/health_app.py` | `/health` 占位端点 |
+| `docker/backend/health_app.py` | `/api/v1/health` 占位端点 |
 | `docker/frontend/Dockerfile` | Nginx 静态占位 |
 | `docker/frontend/nginx.conf` | 反向代理 `/api` → backend |
 | `docker/frontend/index.html` | 占位首页 |
@@ -99,8 +99,12 @@ python scripts/gen_synthetic_data.py --preset fast-epoch -o data/synthetic
 
 # Compose（无 GPU）
 docker compose up -d --build
-curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
 ```
+
+## 基础设施健康端点
+
+`GET /api/v1/health` 是仅供容器健康检查、负载均衡和反向代理使用的基础设施端点。它不进入 `docs/api/openapi.yaml` 的产品 API 契约，但仍遵循 `/api/v1` 前缀，便于 nginx 与其他 API 统一代理。
 
 ## 未包含（Day 2+）
 

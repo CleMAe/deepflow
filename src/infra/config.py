@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_JWT_SECRET_KEY = "dev-secret-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -26,7 +28,10 @@ class Settings(BaseSettings):
     storage_root: str = "./storage"
 
     # Auth
-    jwt_secret_key: str = "dev-secret-change-in-production"
+    jwt_secret_key: str = Field(
+        default=DEFAULT_JWT_SECRET_KEY,
+        validation_alias=AliasChoices("JWT_SECRET_KEY", "JWT_SECRET"),
+    )
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
