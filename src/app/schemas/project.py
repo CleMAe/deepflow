@@ -17,7 +17,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=1024)
-    storage_quota: int | None = None
+    storage_quota: int | None = Field(default=None, ge=0)
 
 
 class ProjectOut(BaseModel):

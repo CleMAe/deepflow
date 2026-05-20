@@ -85,6 +85,14 @@ async def get_current_user_id(
 async def require_project_access(
     project_id: UUID,
     user_id: Annotated[UUID, Depends(get_current_user_id)],
+    db: Session = Depends(get_db),
 ) -> UUID:
-    _ = user_id
+    from src.infra.db.models.project import Project
+    from app.core.errors import ERR_PROJECT_NOT_FOUND, ERR_PROJECT_FORBIDDEN
+
+    project = db.get(Project, project_id)
+    if not project:
+        raise AppError.not_found("Project not found", code=ERR_PROJECT_NOT_FOUND)
+    if project.owner_id != user_id:
+        raise AppError.forbidden("Not your project", code=ERR_PROJECT_FORBIDDEN)
     return project_id

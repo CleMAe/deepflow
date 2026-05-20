@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id, get_db
-from app.core.errors import ERR_AUTH_CREDENTIALS, AppError
+from app.core.errors import ERR_AUTH_CREDENTIALS, ERR_AUTH_INVALID, ERR_AUTH_USERNAME_EXISTS, AppError
 from app.core.response import success
 from app.core.security import (
     create_access_token,
@@ -26,7 +26,10 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/login")
 async def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    if not user:
+        verify_password("dummy", hash_password("dummy"))
+        raise AppError(http_status=401, code=ERR_AUTH_CREDENTIALS, message="Invalid username or password")
+    if not verify_password(body.password, user.password_hash):
         raise AppError(http_status=401, code=ERR_AUTH_CREDENTIALS, message="Invalid username or password")
     access_token, expires_in = create_access_token(user.id, user.username, user.role.value)
     refresh_token = create_refresh_token(user.id)
@@ -41,8 +44,6 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/register", status_code=201)
 async def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    from app.core.errors import ERR_AUTH_USERNAME_EXISTS
-
     existing = db.query(User).filter(User.username == body.username).first()
     if existing:
         raise AppError.bad_request("Username already exists", code=ERR_AUTH_USERNAME_EXISTS)
@@ -59,8 +60,6 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/refresh")
 async def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
-    from app.core.errors import ERR_AUTH_INVALID
-
     try:
         payload = decode_token(body.refresh_token)
     except Exception:

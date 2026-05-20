@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
 
 from src.infra.config import settings
@@ -24,8 +24,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def _encode(payload: dict[str, Any], expires_delta: timedelta) -> str:
     now = datetime.now(timezone.utc)
-    payload.update({"iat": now, "exp": now + expires_delta, "jti": str(uuid4())})
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    claims = {**payload, "iat": now, "exp": now + expires_delta, "jti": str(uuid4())}
+    return jwt.encode(claims, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def create_access_token(user_id: UUID, username: str, role: str) -> tuple[str, int]:
