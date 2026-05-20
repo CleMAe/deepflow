@@ -8,7 +8,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 DatasetFormat = Literal["csv", "json", "image", "other"]
 DatasetStatus = Literal["uploading", "ready", "cleaning", "cleaned", "error"]
 

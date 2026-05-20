@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 
 from app.core.errors import AppError
-from src.infra.db.models import Dataset
 from app.mappers.dataset_mapper import file_size_if_exists, row_to_dataset_schema
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import (
@@ -16,6 +15,7 @@ from app.schemas.dataset import (
     PaginatedImages,
 )
 from shared.protocols import StorageProtocol
+from src.infra.db.models import Dataset
 
 
 class DatasetService:
