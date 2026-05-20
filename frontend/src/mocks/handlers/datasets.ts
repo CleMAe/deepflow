@@ -26,15 +26,18 @@ const mockDatasets = [
 const uploadSessions = new Map<string, { received_chunks: number[]; total_chunks: number }>()
 
 export const datasetHandlers = [
-  http.get('/api/v1/projects/:projectId/datasets', () => {
+  http.get('/api/v1/projects/:projectId/datasets', ({ params }) => {
+    const items = mockDatasets.filter(
+      (d) => d.project_id === params.projectId || d.project_id === 'proj-1'
+    )
     return HttpResponse.json({
       code: 0,
       message: 'success',
       data: {
         page: 1,
         page_size: 20,
-        total: mockDatasets.length,
-        items: mockDatasets,
+        total: items.length,
+        items,
       },
       request_id: 'mock-req-8',
     })
@@ -62,7 +65,7 @@ export const datasetHandlers = [
     })
   }),
 
-  http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/chunk', async ({ params }) => {
+  http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/chunk', async ({ params, request }) => {
     const session = uploadSessions.get(params.uploadId as string)
     if (!session) {
       return HttpResponse.json({ code: 30020002, message: 'Upload session not found' }, { status: 404 })
@@ -90,7 +93,7 @@ export const datasetHandlers = [
     const newDs = {
       id: `ds-${Math.random().toString(36).slice(2)}`,
       name: body.dataset_name || 'uploaded_dataset',
-      project_id: params.projectId,
+      project_id: String(params.projectId),
       format: 'csv',
       file_path: `/projects/${params.projectId}/datasets/new`,
       num_samples: 0,
