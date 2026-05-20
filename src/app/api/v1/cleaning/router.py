@@ -11,7 +11,7 @@ from app.schemas.cleaning import (
     CleanOutlierRequest,
     CleanTypeConvertRequest,
 )
-from app.services.cleaning_mock import MockCleaningService
+from app.services.cleaning_engine import PandasCleaningEngine
 
 router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}/clean", tags=["Cleaning"])
 
@@ -22,9 +22,9 @@ async def clean_missing(
     ds_id: UUID,
     body: CleanMissingRequest,
     _: UUID = Depends(require_project_access),
-    cleaning: MockCleaningService = Depends(get_cleaning_service),
+    cleaning: PandasCleaningEngine = Depends(get_cleaning_service),
 ):
-    result = cleaning.run(project_id, ds_id, "missing")
+    result = cleaning.handle_missing(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))
 
 
@@ -34,9 +34,9 @@ async def clean_outlier(
     ds_id: UUID,
     body: CleanOutlierRequest,
     _: UUID = Depends(require_project_access),
-    cleaning: MockCleaningService = Depends(get_cleaning_service),
+    cleaning: PandasCleaningEngine = Depends(get_cleaning_service),
 ):
-    result = cleaning.run(project_id, ds_id, "outlier")
+    result = cleaning.detect_outliers(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))
 
 
@@ -46,9 +46,9 @@ async def clean_dedup(
     ds_id: UUID,
     body: CleanDedupRequest,
     _: UUID = Depends(require_project_access),
-    cleaning: MockCleaningService = Depends(get_cleaning_service),
+    cleaning: PandasCleaningEngine = Depends(get_cleaning_service),
 ):
-    result = cleaning.run(project_id, ds_id, "dedup")
+    result = cleaning.deduplicate(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))
 
 
@@ -58,9 +58,9 @@ async def clean_encode(
     ds_id: UUID,
     body: CleanEncodeRequest,
     _: UUID = Depends(require_project_access),
-    cleaning: MockCleaningService = Depends(get_cleaning_service),
+    cleaning: PandasCleaningEngine = Depends(get_cleaning_service),
 ):
-    result = cleaning.run(project_id, ds_id, "encode")
+    result = cleaning.encode(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))
 
 
@@ -70,7 +70,7 @@ async def clean_type_convert(
     ds_id: UUID,
     body: CleanTypeConvertRequest,
     _: UUID = Depends(require_project_access),
-    cleaning: MockCleaningService = Depends(get_cleaning_service),
+    cleaning: PandasCleaningEngine = Depends(get_cleaning_service),
 ):
-    result = cleaning.run(project_id, ds_id, "type-convert")
+    result = cleaning.type_convert(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))

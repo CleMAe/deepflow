@@ -16,9 +16,13 @@ from app.core.errors import AppError
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.repositories.dataset_repository import DatasetRepository
-from app.services.cleaning_mock import MockCleaningService
+from app.services.augmentation_service import PillowAugmentationService
+from app.services.cleaning_engine import PandasCleaningEngine
+from app.services.data_parser import PandasDataParser
 from app.services.dataset_service import DatasetService
+from app.services.eda_service import PandasEdaService
 from app.services.storage_mock import MockFileStorage
+from shared.protocols import DataParserProtocol
 from app.services.training_service import TrainingService
 from app.services.upload_service import UploadService
 
@@ -30,6 +34,11 @@ def get_storage() -> StorageProtocol:
     return MockFileStorage()
 
 
+@lru_cache
+def get_data_parser() -> DataParserProtocol:
+    return PandasDataParser()
+
+
 def get_dataset_repo(db: Session = Depends(get_db)) -> DatasetRepository:
     return DatasetRepository(db)
 
@@ -37,23 +46,39 @@ def get_dataset_repo(db: Session = Depends(get_db)) -> DatasetRepository:
 def get_dataset_service(
     repo: DatasetRepository = Depends(get_dataset_repo),
     storage: StorageProtocol = Depends(get_storage),
+    parser: DataParserProtocol = Depends(get_data_parser),
 ) -> DatasetService:
-    return DatasetService(repo, storage)
+    return DatasetService(repo, storage, parser)
 
 
 def get_upload_service(
     storage: StorageProtocol = Depends(get_storage),
     repo: DatasetRepository = Depends(get_dataset_repo),
+    parser: DataParserProtocol = Depends(get_data_parser),
 ) -> UploadService:
-    return UploadService(storage, repo)
+    return UploadService(storage, repo, parser)
 
 
 def get_cleaning_service(
     repo: DatasetRepository = Depends(get_dataset_repo),
     storage: StorageProtocol = Depends(get_storage),
-    datasets: DatasetService = Depends(get_dataset_service),
-) -> MockCleaningService:
-    return MockCleaningService(repo, storage, datasets)
+    parser: DataParserProtocol = Depends(get_data_parser),
+) -> PandasCleaningEngine:
+    return PandasCleaningEngine(repo, storage, parser)
+
+
+def get_eda_service(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+    parser: DataParserProtocol = Depends(get_data_parser),
+) -> PandasEdaService:
+    return PandasEdaService(repo, parser)
+
+
+def get_augmentation_service(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+    storage: StorageProtocol = Depends(get_storage),
+) -> PillowAugmentationService:
+    return PillowAugmentationService(repo, storage)
 
 
 def get_training_service(

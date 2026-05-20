@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from src.infra.db.models import Dataset, DatasetFormat, DatasetStatus
 
-_UPDATABLE_FIELDS = frozenset({"name", "format", "file_path", "num_samples", "columns_meta", "tags", "status"})
+_UPDATABLE_FIELDS = frozenset(
+    {"name", "format", "file_path", "num_samples", "num_columns", "columns_meta", "tags", "status"}
+)
 
 
 def _escape_like_pattern(value: str) -> str:
@@ -72,6 +74,7 @@ class DatasetRepository:
         format: str,
         file_path: str,
         num_samples: int = 0,
+        num_columns: int | None = None,
         columns_meta: list | dict | None = None,
         tags: list[str] | None = None,
         status: str = "uploading",
@@ -85,6 +88,7 @@ class DatasetRepository:
             format=ds_format,
             file_path=file_path,
             num_samples=num_samples,
+            num_columns=num_columns,
             columns_meta=columns_meta,
             tags=tags,
             status=ds_status,

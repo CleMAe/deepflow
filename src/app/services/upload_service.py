@@ -1,4 +1,4 @@
-"""Chunked upload — file I/O only; metadata via DatasetRepository."""
+"""Chunked and simple upload — file I/O + metadata via DatasetRepository."""
 
 from __future__ import annotations
 
@@ -8,10 +8,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.core.config import settings
-from app.core.errors import AppError, ERR_UPLOAD_INCOMPLETE, ERR_UPLOAD_NOT_FOUND
+from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM, ERR_UPLOAD_INCOMPLETE, ERR_UPLOAD_NOT_FOUND
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import UploadCompleteRequest, UploadInitRequest, UploadSessionSchema
-from shared.protocols import StorageProtocol
+from app.services.data_parser import PandasDataParser, columns_meta_to_db
+from shared.protocols import DataParserProtocol, DatasetFormat, StorageProtocol
+
+_SIMPLE_UPLOAD_MAX_BYTES = 500 * 1024 * 1024
 
 
 @dataclass
@@ -29,9 +32,15 @@ class _UploadState:
 
 
 class UploadService:
-    def __init__(self, storage: StorageProtocol, repo: DatasetRepository) -> None:
+    def __init__(
+        self,
+        storage: StorageProtocol,
+        repo: DatasetRepository,
+        parser: DataParserProtocol | None = None,
+    ) -> None:
         self._storage = storage
         self._repo = repo
+        self._parser = parser or PandasDataParser()
         self._sessions: dict[uuid.UUID, _UploadState] = {}
         self._meta_path = Path(settings.storage_root) / "uploads" / "_sessions.json"
         self._load_sessions()
@@ -113,6 +122,41 @@ class UploadService:
             received_chunks=sorted(state.received_chunks),
         )
 
+    def simple_upload(
+        self,
+        project_id: uuid.UUID,
+        *,
+        filename: str,
+        data: bytes,
+        name: str,
+        tags: list[str] | None = None,
+    ):
+        if len(data) > _SIMPLE_UPLOAD_MAX_BYTES:
+            raise AppError.bad_request(
+                "File exceeds 500MB limit",
+                code=ERR_DATASET_INVALID_PARAM,
+            )
+
+        ds_id = uuid.uuid4()
+        raw_dir = Path(self._storage.get_raw_path(str(project_id), str(ds_id)))
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        merged = raw_dir / filename
+        merged.write_bytes(data)
+
+        fmt = _guess_format(filename)
+        row = self._repo.create(
+            dataset_id=ds_id,
+            project_id=project_id,
+            name=name,
+            format=fmt,
+            file_path=str(merged),
+            num_samples=0,
+            columns_meta=[],
+            tags=tags,
+            status="ready",
+        )
+        return self._enrich_with_parse(row, str(merged), fmt)
+
     def complete(
         self,
         project_id: uuid.UUID,
@@ -154,14 +198,34 @@ class UploadService:
         )
         self._sessions.pop(upload_id, None)
         self._persist_sessions()
-        return row
+        return self._enrich_with_parse(row, str(merged), fmt)
+
+    def _enrich_with_parse(self, row, file_path: str, fmt: str):
+        if fmt not in ("csv", "json"):
+            return row
+
+        ds_format = DatasetFormat(fmt)
+        validation = self._parser.validate_file(file_path, ds_format)
+        if not validation.valid:
+            msg = validation.errors[0]["message"] if validation.errors else "Invalid dataset file"
+            raise AppError.bad_request(msg, code=ERR_DATASET_INVALID_PARAM)
+
+        columns_meta = self._parser.get_columns_meta(file_path, ds_format)
+        num_samples = self._parser.count_rows(file_path, ds_format)
+        return self._repo.update(
+            row,
+            num_samples=num_samples,
+            num_columns=len(columns_meta),
+            columns_meta=columns_meta_to_db(columns_meta),
+            status="ready",
+        )
 
 
 def _guess_format(filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext in {".csv", ".tsv"}:
         return "csv"
-    if ext in {".json", ".jsonl"}:
+    if ext in {".json", ".jsonl", ".ndjson"}:
         return "json"
     if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
         return "image"
