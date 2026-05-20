@@ -1,12 +1,14 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/api/types'
 
+import { DEMO_PROJECT_ID, MOCK_ALT_PROJECT_ID } from '@/mocks/demoIds'
+
 type Experiment = components['schemas']['Experiment']
 
 const mockExperiments: Experiment[] = [
   {
     id: 'exp-1',
-    project_id: 'proj-1',
+    project_id: MOCK_ALT_PROJECT_ID,
     job_id: 'job-1',
     name: 'ResNet-18 基准实验',
     metrics: { accuracy: 0.92, precision: 0.91, recall: 0.89, f1: 0.9 },
@@ -17,7 +19,7 @@ const mockExperiments: Experiment[] = [
   },
   {
     id: 'exp-2',
-    project_id: 'proj-1',
+    project_id: DEMO_PROJECT_ID,
     job_id: 'job-2',
     name: 'MLP 销售预测实验',
     metrics: { mse: 0.18, rmse: 0.42, mae: 0.31 },

@@ -1,24 +1,26 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/api/types'
 
+import { DEMO_DATASET_CSV_ID, DEMO_DATASET_IMAGE_ID, DEMO_PROJECT_ID, MOCK_ALT_PROJECT_ID } from '@/mocks/demoIds'
+
 type TrainingStatus = components['schemas']['TrainingStatus']
 type TrainingJob = components['schemas']['TrainingJob']
 
 const mockJobs: TrainingJob[] = [
   {
     id: 'job-1',
-    project_id: 'proj-1',
+    project_id: MOCK_ALT_PROJECT_ID,
     name: 'ResNet-18 第一轮训练',
     model_id: 'model-1',
-    dataset_id: 'ds-1',
-    val_dataset_id: 'ds-1',
+    dataset_id: DEMO_DATASET_IMAGE_ID,
+    val_dataset_id: DEMO_DATASET_IMAGE_ID,
     hyperparams: { epochs: 10, batch_size: 32, learning_rate: 0.001, optimizer: 'adam', loss_function: 'cross_entropy', weight_decay: 0, lr_scheduler: 'none', grad_accum_steps: 1, mixed_precision: false, checkpoint_every_n_epochs: 1 },
     status: 'success',
     device: 'cuda',
     current_epoch: 10,
     total_epochs: 10,
     metrics: { train_loss: 0.12, val_loss: 0.18, accuracy: 0.92, best_val_loss: 0.15, best_accuracy: 0.93 },
-    checkpoint: '/projects/proj-1/training/job-1/checkpoint/best.pth',
+    checkpoint: `/projects/${MOCK_ALT_PROJECT_ID}/training/job-1/checkpoint/best.pth`,
     started_at: '2026-05-19T08:00:00Z',
     finished_at: '2026-05-19T08:30:00Z',
     created_at: '2026-05-19T07:55:00Z',
@@ -26,10 +28,10 @@ const mockJobs: TrainingJob[] = [
   },
   {
     id: 'job-2',
-    project_id: 'proj-1',
+    project_id: DEMO_PROJECT_ID,
     name: 'MLP 销售预测训练',
     model_id: 'model-2',
-    dataset_id: 'ds-2',
+    dataset_id: DEMO_DATASET_CSV_ID,
     hyperparams: { epochs: 50, batch_size: 64, learning_rate: 0.01, optimizer: 'adam', loss_function: 'mse', weight_decay: 0.0001, lr_scheduler: 'step', grad_accum_steps: 1, mixed_precision: false, checkpoint_every_n_epochs: 5 },
     status: 'running',
     device: 'cpu',

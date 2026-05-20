@@ -1,18 +1,20 @@
 import { http, HttpResponse } from 'msw'
 
+import { DEMO_PROJECT_ID, DEMO_USER_ID, MOCK_ALT_PROJECT_ID } from '@/mocks/demoIds'
+
 const mockProjects = [
   {
-    id: 'proj-1',
+    id: MOCK_ALT_PROJECT_ID,
     name: '商品图像分类',
     description: '电商商品图像分类项目',
-    owner_id: 'mock-user-id',
+    owner_id: DEMO_USER_ID,
     created_at: '2026-05-18T08:00:00Z',
   },
   {
-    id: 'proj-2',
+    id: DEMO_PROJECT_ID,
     name: '销售预测',
     description: '基于历史数据的销售回归预测',
-    owner_id: 'mock-user-id',
+    owner_id: DEMO_USER_ID,
     created_at: '2026-05-18T09:00:00Z',
   },
 ]
@@ -48,10 +50,10 @@ export const projectHandlers = [
         code: 0,
         message: 'success',
         data: {
-          id: 'proj-new',
+          id: '33333333-3333-3333-3333-333333333333',
           name: '新项目',
           description: '',
-          owner_id: 'mock-user-id',
+          owner_id: DEMO_USER_ID,
           created_at: new Date().toISOString(),
         },
         request_id: 'mock-req-7',
