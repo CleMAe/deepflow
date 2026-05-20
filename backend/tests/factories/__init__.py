@@ -1,6 +1,11 @@
-from tests.factories.base import TestRecordFactory
 from tests.factories.dataset import DatasetFactory
 from tests.factories.project import ProjectFactory
-from tests.factories.user import UserFactory
+from tests.factories.user import TEST_PASSWORD, TEST_PASSWORD_HASH, UserFactory
 
-__all__ = ["TestRecordFactory", "UserFactory", "ProjectFactory", "DatasetFactory"]
+__all__ = [
+    "DatasetFactory",
+    "ProjectFactory",
+    "UserFactory",
+    "TEST_PASSWORD",
+    "TEST_PASSWORD_HASH",
+]
