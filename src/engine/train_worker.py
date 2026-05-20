@@ -74,7 +74,7 @@ def _init_status(path: str, total_epochs: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Synthetic data generator (for testing when no real dataset exists)
+# Synthetic data generators (fallback when no real dataset exists)
 # ---------------------------------------------------------------------------
 
 def _make_synthetic_loader(
@@ -99,42 +99,105 @@ def _make_synthetic_cv_loader(
 
 
 # ---------------------------------------------------------------------------
-# CSV / JSON dataset loading (simple tabular)
+# CSV / JSON dataset loading (tabular)
 # ---------------------------------------------------------------------------
 
 def _load_tabular_dataset(
     dataset_path: str,
     batch_size: int = 32,
-) -> DataLoader:
+) -> DataLoader | None:
     path = Path(dataset_path)
     if not path.exists():
-        return _make_synthetic_loader(batch_size=batch_size)
+        return None
 
     suffix = path.suffix.lower()
-    if suffix == ".csv":
-        try:
-            import pandas as pd
-            df = pd.read_csv(path)
-            label_col = df.columns[-1]
-            X = torch.tensor(df.drop(columns=[label_col]).select_dtypes(include="number").values, dtype=torch.float32)
-            labels = df[label_col].astype("category").cat.codes.values
-            y = torch.tensor(labels, dtype=torch.long)
-            return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
-        except Exception:
-            return _make_synthetic_loader(batch_size=batch_size)
-    elif suffix == ".json":
-        try:
-            import pandas as pd
-            df = pd.read_json(path)
-            label_col = df.columns[-1]
-            X = torch.tensor(df.drop(columns=[label_col]).select_dtypes(include="number").values, dtype=torch.float32)
-            labels = df[label_col].astype("category").cat.codes.values
-            y = torch.tensor(labels, dtype=torch.long)
-            return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
-        except Exception:
-            return _make_synthetic_loader(batch_size=batch_size)
+    if suffix not in (".csv", ".json"):
+        return None
+
+    try:
+        import pandas as pd
+        df = pd.read_csv(path) if suffix == ".csv" else pd.read_json(path)
+        label_col = df.columns[-1]
+        X = torch.tensor(df.drop(columns=[label_col]).select_dtypes(include="number").values, dtype=torch.float32)
+        labels = df[label_col].astype("category").cat.codes.values
+        y = torch.tensor(labels, dtype=torch.long)
+        return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Image dataset loading (directory of images organized by class)
+# ---------------------------------------------------------------------------
+
+def _load_image_dataset(
+    dataset_path: str,
+    batch_size: int = 32,
+) -> DataLoader | None:
+    path = Path(dataset_path)
+
+    # Direct file (e.g. a single image or non-directory) — skip
+    if path.exists() and not path.is_dir():
+        return None
+
+    # Try ImageFolder: expects <root>/<class_name>/<images>
+    if path.is_dir():
+        class_dirs = [d for d in path.iterdir() if d.is_dir()]
+        if class_dirs:
+            try:
+                from torchvision import datasets, transforms
+                transform = transforms.Compose([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ])
+                dataset = datasets.ImageFolder(str(path), transform=transform)
+                return DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+            except Exception:
+                return None
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Dataset dispatcher — tries real data, falls back to synthetic
+# ---------------------------------------------------------------------------
+
+_CV_ARCHS = frozenset({"resnet18", "resnet34", "resnet50", "efficientnetb0", "efficientnetb1"})
+
+
+def _is_cv_arch(arch_type: str) -> bool:
+    return arch_type.lower().replace("-", "").replace("_", "") in _CV_ARCHS
+
+
+def _load_dataset(
+    dataset_path: str,
+    arch_type: str,
+    batch_size: int = 32,
+    is_val: bool = False,
+) -> DataLoader:
+    """Try loading real dataset; fall back to synthetic only when file/dir missing."""
+    is_cv = _is_cv_arch(arch_type)
+
+    if is_cv:
+        # For CV archs, try ImageFolder first, then tabular (some users store
+        # image metadata as CSV), then synthetic
+        loader = _load_image_dataset(dataset_path, batch_size)
+        if loader is not None:
+            return loader
+        loader = _load_tabular_dataset(dataset_path, batch_size)
+        if loader is not None:
+            return loader
+        n = 64 if is_val else 256
+        return _make_synthetic_cv_loader(n_samples=n, batch_size=batch_size)
     else:
-        return _make_synthetic_loader(batch_size=batch_size)
+        # For tabular archs, try CSV/JSON first, then synthetic
+        loader = _load_tabular_dataset(dataset_path, batch_size)
+        if loader is not None:
+            return loader
+        n = 128 if is_val else 512
+        return _make_synthetic_loader(n_samples=n, batch_size=batch_size)
 
 
 # ---------------------------------------------------------------------------
@@ -357,18 +420,13 @@ def run(args: argparse.Namespace) -> None:
     # Status
     status = _init_status(args.status_file, epochs)
 
-    # Dataset
-    is_cv = args.model_arch.lower().replace("-", "").replace("_", "") in (
-        "resnet18", "resnet34", "resnet50", "efficientnetb0", "efficientnetb1",
-    )
-    train_loader = _load_tabular_dataset(args.dataset_path, batch_size) if not is_cv else _make_synthetic_cv_loader(batch_size=batch_size)
+    # Dataset — try real data first, fall back to synthetic
+    train_loader = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=False)
     val_loader: DataLoader | None = None
     if args.val_dataset_path:
-        val_loader = _load_tabular_dataset(args.val_dataset_path, batch_size)
-    if val_loader is None and is_cv:
-        val_loader = _make_synthetic_cv_loader(n_samples=64, batch_size=batch_size)
-    elif val_loader is None:
-        val_loader = _make_synthetic_loader(n_samples=128, batch_size=batch_size)
+        val_loader = _load_dataset(args.val_dataset_path, args.model_arch, batch_size, is_val=True)
+    if val_loader is None:
+        val_loader = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=True)
 
     # Infer input dim / n_classes from first batch
     sample_X, sample_y = next(iter(train_loader))

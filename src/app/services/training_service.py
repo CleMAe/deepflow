@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.engine.manager import TrainingEngineManager
+from src.infra.db.models.dataset import Dataset
 from src.infra.db.models.ml_model import MLModel
 from src.infra.db.models.training_job import TrainingJob, TrainingJobStatus
 from src.shared.protocols import StorageProtocol
@@ -70,6 +71,15 @@ class TrainingService:
         if not model or model.project_id != project_id:
             raise AppError.not_found("Model not found", code=ERR_MODEL_NOT_FOUND)
 
+        # Verify datasets exist
+        ds = db.get(Dataset, uuid.UUID(payload.dataset_id))
+        if not ds or ds.project_id != project_id:
+            raise AppError.not_found("Dataset not found")
+        if payload.val_dataset_id:
+            vds = db.get(Dataset, uuid.UUID(payload.val_dataset_id))
+            if not vds or vds.project_id != project_id:
+                raise AppError.not_found("Validation dataset not found")
+
         hp = payload.hyperparams.model_dump(mode="json")
         job = TrainingJob(
             project_id=project_id,
@@ -105,6 +115,11 @@ class TrainingService:
             base.order_by(TrainingJob.created_at.desc()).offset(offset).limit(page_size)
         ).all()
 
+        # Sync status from engine for running/paused jobs in the list
+        for job in rows:
+            if job.status in (TrainingJobStatus.RUNNING, TrainingJobStatus.PAUSED):
+                self._sync_progress(db, job)
+
         return {
             "page": page,
             "page_size": page_size,
@@ -114,36 +129,7 @@ class TrainingService:
 
     def get_job(self, db: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> TrainingJobOut:
         job = self._get_and_check(db, project_id, job_id)
-
-        # Sync subprocess status into DB
-        progress = _engine.get_progress(str(job_id))
-        if progress:
-            job.current_epoch = progress.get("current_epoch", job.current_epoch)
-            job.metrics = {
-                "train_loss": progress.get("train_loss"),
-                "val_loss": progress.get("val_loss"),
-                "accuracy": progress.get("accuracy"),
-                "best_val_loss": progress.get("best_val_loss"),
-                "best_accuracy": progress.get("best_accuracy"),
-            }
-            if progress.get("checkpoint_path"):
-                job.checkpoint = progress["checkpoint_path"]
-            if progress.get("error_message") and progress["status"] == "failed":
-                job.error_message = progress["error_message"]
-
-            engine_status = progress.get("status")
-            if engine_status and engine_status != job.status.value:
-                try:
-                    new_status = TrainingJobStatus(engine_status)
-                    job.status = new_status
-                    if new_status in (TrainingJobStatus.SUCCESS, TrainingJobStatus.FAILED, TrainingJobStatus.CANCELLED):
-                        job.finished_at = datetime.now(timezone.utc)
-                except ValueError:
-                    pass
-
-            db.commit()
-            db.refresh(job)
-
+        self._sync_progress(db, job)
         return _job_to_out(job)
 
     def start_job(self, db: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> TrainingJobOut:
@@ -154,11 +140,17 @@ class TrainingService:
 
         model = db.get(MLModel, job.model_id)
         arch_type = model.arch_type if model else "mlp"
-        dataset_path = self._storage.get_raw_path(str(project_id), str(job.dataset_id))
+
+        # Use the actual uploaded file path from Dataset record
+        ds = db.get(Dataset, job.dataset_id)
+        dataset_path = ds.file_path if ds and ds.file_path else self._storage.get_raw_path(str(project_id), str(job.dataset_id))
+
         checkpoint_dir = self._storage.get_checkpoint_path(str(project_id), str(job.model_id))
+
         val_path = None
         if job.val_dataset_id:
-            val_path = self._storage.get_raw_path(str(project_id), str(job.val_dataset_id))
+            vds = db.get(Dataset, job.val_dataset_id)
+            val_path = vds.file_path if vds and vds.file_path else self._storage.get_raw_path(str(project_id), str(job.val_dataset_id))
 
         _engine.start_training(
             job_id=str(job_id),
@@ -210,6 +202,8 @@ class TrainingService:
         lines = _engine.get_logs(str(job_id), tail)
         return TrainingLogOut(logs=lines)
 
+    # --- internal ---
+
     def _get_and_check(self, db: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> TrainingJob:
         job = db.get(TrainingJob, job_id)
         if not job or job.project_id != project_id:
@@ -224,3 +218,56 @@ class TrainingService:
                 code=ERR_TRAINING_INVALID_TRANSITION,
             )
         job.status = target
+
+    def _sync_progress(self, db: Session, job: TrainingJob) -> None:
+        """Sync subprocess status into DB. Also creates Experiment on terminal state."""
+        progress = _engine.get_progress(str(job.id))
+        if not progress:
+            return
+
+        job.current_epoch = progress.get("current_epoch", job.current_epoch)
+        job.metrics = {
+            "train_loss": progress.get("train_loss"),
+            "val_loss": progress.get("val_loss"),
+            "accuracy": progress.get("accuracy"),
+            "best_val_loss": progress.get("best_val_loss"),
+            "best_accuracy": progress.get("best_accuracy"),
+        }
+        if progress.get("checkpoint_path"):
+            job.checkpoint = progress["checkpoint_path"]
+        if progress.get("error_message") and progress["status"] == "failed":
+            job.error_message = progress["error_message"]
+
+        engine_status = progress.get("status")
+        if engine_status and engine_status != job.status.value:
+            try:
+                new_status = TrainingJobStatus(engine_status)
+                job.status = new_status
+                if new_status in (TrainingJobStatus.SUCCESS, TrainingJobStatus.FAILED, TrainingJobStatus.CANCELLED):
+                    job.finished_at = datetime.now(timezone.utc)
+                    self._ensure_experiment(db, job)
+            except ValueError:
+                pass
+
+        db.commit()
+        db.refresh(job)
+
+    def _ensure_experiment(self, db: Session, job: TrainingJob) -> None:
+        """Create an Experiment record when a training job reaches terminal state."""
+        from src.infra.db.models.experiment import Experiment
+
+        existing = db.scalar(
+            select(Experiment).where(Experiment.job_id == job.id)
+        )
+        if existing:
+            return
+
+        exp = Experiment(
+            project_id=job.project_id,
+            job_id=job.id,
+            name=job.name,
+            metrics=job.metrics,
+            params_snap=job.hyperparams,
+            tags=["auto"],
+        )
+        db.add(exp)

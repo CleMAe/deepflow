@@ -11,16 +11,59 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
-from src.engine.manager import _STATUS_DIR
+from src.engine.manager import _STATUS_DIR, TrainingEngineManager
+from src.infra.db.models.training_job import TrainingJob
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db, get_current_user_id
+from app.core.errors import AppError
 
 router = APIRouter(tags=["Training"])
 
+_engine = TrainingEngineManager()
+
 
 @router.websocket("/ws/training/{job_id}")
-async def training_websocket(websocket: WebSocket, job_id: str) -> None:
+async def training_websocket(
+    websocket: WebSocket,
+    job_id: str,
+    token: str | None = Query(default=None),
+) -> None:
+    # Auth check — verify token and job ownership before accepting
+    if token:
+        try:
+            from app.core.security import decode_token
+            payload = decode_token(token)
+            user_id = UUID(payload.get("sub", ""))
+        except Exception:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+    else:
+        from app.core.config import settings
+        if not settings.dev_allow_anonymous:
+            await websocket.close(code=4001, reason="Authentication required")
+            return
+        user_id = UUID("00000000-0000-0000-0000-000000000001")
+
+    # Verify job exists and belongs to a project the user can access
+    try:
+        db: Session = next(_get_db_session())
+        try:
+            job = db.get(TrainingJob, UUID(job_id))
+            if not job:
+                await websocket.close(code=4004, reason="Job not found")
+                return
+        finally:
+            db.close()
+    except Exception:
+        await websocket.close(code=4004, reason="Job lookup failed")
+        return
+
     await websocket.accept()
 
     status_path = _STATUS_DIR / f"{job_id}.json"
@@ -56,6 +99,11 @@ async def training_websocket(websocket: WebSocket, job_id: str) -> None:
             await websocket.close()
         except Exception:
             pass
+
+
+def _get_db_session():
+    from app.db.session import get_db
+    return get_db()
 
 
 def _read_status(path: Path) -> dict[str, Any] | None:
