@@ -2,10 +2,9 @@ import { useState, useCallback } from 'react'
 import { Upload, Progress, message } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import type { UploadFile, UploadProps } from 'antd/es/upload'
-import { initUpload, uploadChunk, completeUpload, uploadSimple } from '@/api/upload'
+import { initUpload, uploadChunk, completeUpload } from '@/api/upload'
 
 const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024
-const MAX_SIMPLE_SIZE = 500 * 1024 * 1024
 
 interface FileUploadProps {
   projectId: string
@@ -26,37 +25,31 @@ export default function FileUpload({ projectId, multiple = false, accept, onSucc
       setProgress(0)
 
       try {
-        if (f.size <= MAX_SIMPLE_SIZE) {
-          await uploadSimple(projectId, f)
-          setProgress(100)
-          onProgress?.({ percent: 100 })
-        } else {
-          const totalChunks = Math.ceil(f.size / DEFAULT_CHUNK_SIZE)
-          const session = await initUpload(projectId, {
-            filename: f.name,
-            total_size: f.size,
-            total_chunks: totalChunks,
-            dataset_name: f.name,
-          })
+        const totalChunks = Math.ceil(f.size / DEFAULT_CHUNK_SIZE)
+        const session = await initUpload(projectId, {
+          filename: f.name,
+          total_size: f.size,
+          total_chunks: totalChunks,
+          dataset_name: f.name,
+        })
 
-          const uploadId = session.upload_id!
-          const chunkSize = session.chunk_size || DEFAULT_CHUNK_SIZE
+        const uploadId = session.upload_id!
+        const chunkSize = session.chunk_size || DEFAULT_CHUNK_SIZE
 
-          for (let i = 0; i < totalChunks; i++) {
-            const start = i * chunkSize
-            const end = Math.min(start + chunkSize, f.size)
-            const chunk = f.slice(start, end)
-            await uploadChunk(projectId, uploadId, i, totalChunks, chunk)
-            const percent = Math.round(((i + 1) / totalChunks) * 100)
-            setProgress(percent)
-            onProgress?.({ percent })
-          }
-
-          await completeUpload(projectId, uploadId, {
-            total_chunks: totalChunks,
-            dataset_name: f.name,
-          })
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * chunkSize
+          const end = Math.min(start + chunkSize, f.size)
+          const chunk = f.slice(start, end)
+          await uploadChunk(projectId, uploadId, i, totalChunks, chunk)
+          const percent = Math.round(((i + 1) / totalChunks) * 100)
+          setProgress(percent)
+          onProgress?.({ percent })
         }
+
+        await completeUpload(projectId, uploadId, {
+          total_chunks: totalChunks,
+          dataset_name: f.name,
+        })
 
         message.success(`${f.name} 上传成功`)
         onOk?.(null)

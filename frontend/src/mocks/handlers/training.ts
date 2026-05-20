@@ -42,21 +42,27 @@ const mockJobs: TrainingJob[] = [
   },
 ]
 
-const pollCounts = new Map<string, number>()
+const VALID_TRANSITIONS: Record<string, Set<string>> = {
+  pending: new Set(['running', 'cancelled']),
+  running: new Set(['paused', 'success', 'failed', 'cancelled']),
+  paused: new Set(['running', 'cancelled']),
+  success: new Set(),
+  failed: new Set(),
+  cancelled: new Set(),
+}
 
-function nextStatus(status: TrainingStatus, action: 'start' | 'pause' | 'resume' | 'stop'): TrainingStatus {
-  switch (action) {
-    case 'start':
-      return 'running'
-    case 'pause':
-      return 'paused'
-    case 'resume':
-      return 'running'
-    case 'stop':
-      return 'cancelled'
-    default:
-      return status
+function transition(status: TrainingStatus, action: 'start' | 'pause' | 'resume' | 'stop'): { status: TrainingStatus; error?: string } {
+  const target: Record<string, TrainingStatus> = {
+    start: 'running',
+    pause: 'paused',
+    resume: 'running',
+    stop: 'cancelled',
   }
+  const next = target[action]
+  if (!VALID_TRANSITIONS[status]?.has(next)) {
+    return { status, error: `Cannot transition from ${status} to ${next}` }
+  }
+  return { status: next }
 }
 
 export const trainingHandlers = [
@@ -87,7 +93,6 @@ export const trainingHandlers = [
       updated_at: new Date().toISOString(),
     }
     mockJobs.push(newJob)
-    pollCounts.set(newJob.id!, 0)
     return HttpResponse.json(
       { code: 0, message: 'success', data: newJob, request_id: 'mock-training-create' },
       { status: 201 }
@@ -97,15 +102,19 @@ export const trainingHandlers = [
   http.get('/api/v1/projects/:projectId/training-jobs/:jobId', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
     if (!job) {
-      return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
+      return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
     }
     return HttpResponse.json({ code: 0, message: 'success', data: job, request_id: 'mock-training-get' })
   }),
 
   http.post('/api/v1/projects/:projectId/training-jobs/:jobId/start', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
-    job.status = nextStatus(job.status!, 'start')
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
+    const result = transition(job.status!, 'start')
+    if (result.error) {
+      return HttpResponse.json({ code: 50010001, message: result.error }, { status: 400 })
+    }
+    job.status = result.status
     job.started_at = new Date().toISOString()
     job.updated_at = new Date().toISOString()
     return HttpResponse.json({ code: 0, message: 'success', data: job, request_id: 'mock-training-start' })
@@ -113,24 +122,36 @@ export const trainingHandlers = [
 
   http.post('/api/v1/projects/:projectId/training-jobs/:jobId/pause', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
-    job.status = nextStatus(job.status!, 'pause')
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
+    const result = transition(job.status!, 'pause')
+    if (result.error) {
+      return HttpResponse.json({ code: 50010001, message: result.error }, { status: 400 })
+    }
+    job.status = result.status
     job.updated_at = new Date().toISOString()
     return HttpResponse.json({ code: 0, message: 'success', data: job, request_id: 'mock-training-pause' })
   }),
 
   http.post('/api/v1/projects/:projectId/training-jobs/:jobId/resume', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
-    job.status = nextStatus(job.status!, 'resume')
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
+    const result = transition(job.status!, 'resume')
+    if (result.error) {
+      return HttpResponse.json({ code: 50010001, message: result.error }, { status: 400 })
+    }
+    job.status = result.status
     job.updated_at = new Date().toISOString()
     return HttpResponse.json({ code: 0, message: 'success', data: job, request_id: 'mock-training-resume' })
   }),
 
   http.post('/api/v1/projects/:projectId/training-jobs/:jobId/stop', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
-    job.status = nextStatus(job.status!, 'stop')
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
+    const result = transition(job.status!, 'stop')
+    if (result.error) {
+      return HttpResponse.json({ code: 50010001, message: result.error }, { status: 400 })
+    }
+    job.status = result.status
     job.finished_at = new Date().toISOString()
     job.updated_at = new Date().toISOString()
     return HttpResponse.json({ code: 0, message: 'success', data: job, request_id: 'mock-training-stop' })
@@ -138,17 +159,17 @@ export const trainingHandlers = [
 
   http.get('/api/v1/projects/:projectId/training-jobs/:jobId/logs', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
     const logs = [
-      { level: 'INFO', message: 'Training started', timestamp: job.started_at || job.created_at },
-      { level: 'INFO', message: `Epoch ${job.current_epoch}/${job.total_epochs} - loss: ${job.metrics?.train_loss ?? 0.5}`, timestamp: job.updated_at },
+      `INFO Training started at ${job.started_at || job.created_at}`,
+      `INFO Epoch ${job.current_epoch}/${job.total_epochs} - loss: ${job.metrics?.train_loss ?? 0.5}`,
     ]
     return HttpResponse.json({ code: 0, message: 'success', data: { logs }, request_id: 'mock-training-logs' })
   }),
 
   http.get('/api/v1/projects/:projectId/training-jobs/:jobId/checkpoints', ({ params }) => {
     const job = mockJobs.find((j) => j.id === params.jobId)
-    if (!job) return HttpResponse.json({ code: 40404, message: 'job not found' }, { status: 404 })
+    if (!job) return HttpResponse.json({ code: 50020001, message: 'Training job not found' }, { status: 404 })
     const checkpoints = [
       { epoch: 1, step: 100, path: `/projects/${params.projectId}/training/${params.jobId}/checkpoint/epoch_1.pth`, is_best: false, metrics: { val_loss: 0.45 }, file_size: 45000000, created_at: job.created_at },
       { epoch: 5, step: 500, path: `/projects/${params.projectId}/training/${params.jobId}/checkpoint/epoch_5.pth`, is_best: true, metrics: { val_loss: 0.18 }, file_size: 45000000, created_at: job.updated_at },

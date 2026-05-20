@@ -62,18 +62,9 @@ export const experimentHandlers = [
   http.get('/api/v1/projects/:projectId/experiments/:expId', ({ params }) => {
     const exp = mockExperiments.find((e) => e.id === params.expId)
     if (!exp) {
-      return HttpResponse.json({ code: 40404, message: 'experiment not found' }, { status: 404 })
+      return HttpResponse.json({ code: 40020001, message: 'experiment not found' }, { status: 404 })
     }
     return HttpResponse.json({ code: 0, message: 'success', data: exp, request_id: 'mock-experiments-get' })
-  }),
-
-  http.delete('/api/v1/projects/:projectId/experiments/:expId', ({ params }) => {
-    const idx = mockExperiments.findIndex((e) => e.id === params.expId)
-    if (idx === -1) {
-      return HttpResponse.json({ code: 40404, message: 'experiment not found' }, { status: 404 })
-    }
-    mockExperiments.splice(idx, 1)
-    return HttpResponse.json({ code: 0, message: 'deleted', data: null, request_id: 'mock-experiments-delete' })
   }),
 
   http.post('/api/v1/projects/:projectId/experiments/compare', async ({ request }) => {

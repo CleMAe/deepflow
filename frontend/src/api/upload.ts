@@ -40,12 +40,3 @@ export async function completeUpload(
   return unwrapApiData<Dataset>(res)
 }
 
-export async function uploadSimple(projectId: string, file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('name', file.name)
-  const res = await api.post(`/projects/${projectId}/datasets/upload`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return unwrapApiData<Dataset>(res)
-}

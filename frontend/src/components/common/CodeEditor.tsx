@@ -1,4 +1,5 @@
 import { useRef, useMemo } from 'react'
+import { Button } from 'antd'
 
 interface CodeEditorProps {
   value: string
@@ -66,34 +67,8 @@ export default function CodeEditor({
     <div style={{ width: '100%' }}>
       {language === 'json' && !readOnly && (
         <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            onClick={handleFormat}
-            style={{
-              padding: '2px 8px',
-              fontSize: 12,
-              cursor: 'pointer',
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
-              background: '#fff',
-            }}
-          >
-            格式化
-          </button>
-          <button
-            type="button"
-            onClick={handleMinify}
-            style={{
-              padding: '2px 8px',
-              fontSize: 12,
-              cursor: 'pointer',
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
-              background: '#fff',
-            }}
-          >
-            压缩
-          </button>
+          <Button size="small" onClick={handleFormat}>格式化</Button>
+          <Button size="small" onClick={handleMinify}>压缩</Button>
         </div>
       )}
       <div
@@ -117,6 +92,7 @@ export default function CodeEditor({
             textAlign: 'right',
             padding: '8px 6px',
             overflow: 'hidden',
+            overflowY: 'hidden',
             userSelect: 'none',
             flexShrink: 0,
           }}

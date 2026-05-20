@@ -65,7 +65,7 @@ export const datasetHandlers = [
   http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/chunk', async ({ params }) => {
     const session = uploadSessions.get(params.uploadId as string)
     if (!session) {
-      return HttpResponse.json({ code: 40404, message: 'Upload session not found' }, { status: 404 })
+      return HttpResponse.json({ code: 30020002, message: 'Upload session not found' }, { status: 404 })
     }
     const form = await request.formData()
     const index = Number(form.get('chunk_index'))
@@ -83,7 +83,7 @@ export const datasetHandlers = [
   http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/complete', async ({ params, request }) => {
     const session = uploadSessions.get(params.uploadId as string)
     if (!session) {
-      return HttpResponse.json({ code: 40404, message: 'Upload session not found' }, { status: 404 })
+      return HttpResponse.json({ code: 30020002, message: 'Upload session not found' }, { status: 404 })
     }
     const body = (await request.json()) as { dataset_name?: string }
     uploadSessions.delete(params.uploadId as string)
@@ -106,28 +106,4 @@ export const datasetHandlers = [
     })
   }),
 
-  http.post('/api/v1/projects/:projectId/datasets/upload', async ({ params, request }) => {
-    const form = await request.formData()
-    const name = (form.get('name') as string) || 'uploaded_file'
-    const newDs = {
-      id: `ds-${Math.random().toString(36).slice(2)}`,
-      name,
-      project_id: params.projectId,
-      format: 'csv',
-      file_path: `/projects/${params.projectId}/datasets/new`,
-      num_samples: 0,
-      status: 'ready',
-      created_at: new Date().toISOString(),
-    }
-    mockDatasets.push(newDs)
-    return HttpResponse.json(
-      {
-        code: 0,
-        message: 'upload completed',
-        data: newDs,
-        request_id: 'mock-req-simple',
-      },
-      { status: 201 },
-    )
-  }),
 ]

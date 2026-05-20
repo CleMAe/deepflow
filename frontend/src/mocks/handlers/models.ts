@@ -8,7 +8,7 @@ const mockModels = [
     arch_type: 'resnet18',
     params_cfg: { num_classes: 3, image_size: 224 },
     pretrained: true,
-    pretrained_source: 'torchvision',
+    pretrained_source: 'huggingface',
     model_path: '/projects/proj-1/models/model-1/checkpoint/best.pth',
     description: '用于商品图片分类的默认模型',
     created_at: '2026-05-18T12:00:00Z',
@@ -68,7 +68,7 @@ export const modelHandlers = [
   http.get('/api/v1/projects/:projectId/models/:mId', ({ params }) => {
     const model = mockModels.find((m) => m.id === params.mId)
     if (!model) {
-      return HttpResponse.json({ code: 40404, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
     }
     return HttpResponse.json({
       code: 0,
@@ -81,7 +81,7 @@ export const modelHandlers = [
   http.put('/api/v1/projects/:projectId/models/:mId', async ({ params, request }) => {
     const model = mockModels.find((m) => m.id === params.mId)
     if (!model) {
-      return HttpResponse.json({ code: 40404, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
     }
     const body = (await request.json()) as { name?: string; params_cfg?: Record<string, unknown>; description?: string }
     Object.assign(model, body, { updated_at: new Date().toISOString() })
@@ -96,7 +96,7 @@ export const modelHandlers = [
   http.delete('/api/v1/projects/:projectId/models/:mId', ({ params }) => {
     const idx = mockModels.findIndex((m) => m.id === params.mId)
     if (idx === -1) {
-      return HttpResponse.json({ code: 40404, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
     }
     mockModels.splice(idx, 1)
     return HttpResponse.json({ code: 0, message: 'deleted', data: null, request_id: 'mock-models-delete' })
@@ -120,7 +120,7 @@ export const modelHandlers = [
   http.post('/api/v1/projects/:projectId/models/:mId/pretrained', async ({ params }) => {
     const model = mockModels.find((m) => m.id === params.mId)
     if (!model) {
-      return HttpResponse.json({ code: 40404, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
     }
     return HttpResponse.json({
       code: 0,
