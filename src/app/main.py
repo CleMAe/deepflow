@@ -25,7 +25,7 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.errors import ERR_SYSTEM_DB_UNAVAILABLE
 from app.core.response import failure, success
-from app.db.seed import seed_demo_datasets
+from app.db.seed import seed_demo_datasets, seed_demo_project, seed_demo_user
 from app.db.session import get_db, init_db
 from src.infra.config import DEFAULT_JWT_SECRET_KEY
 
@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
     init_db()
     with closing(get_db()) as db_gen:
         db = next(db_gen)
+        seed_demo_user(db)
+        seed_demo_project(db)
         seed_demo_datasets(db)
     yield
 

@@ -13,6 +13,7 @@ from shared.protocols import StorageProtocol
 
 from app.core.config import settings
 from app.core.errors import AppError
+from app.core.security import decode_token
 from app.db.session import get_db
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
@@ -64,11 +65,21 @@ def get_training_service(
 async def get_current_user_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UUID:
-    if settings.dev_allow_anonymous:
+    if settings.dev_allow_anonymous and not credentials:
         return UUID("00000000-0000-0000-0000-000000000001")
+
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AppError.unauthorized("Missing or invalid Authorization header")
-    return UUID("00000000-0000-0000-0000-000000000001")
+
+    try:
+        payload = decode_token(credentials.credentials)
+    except Exception:
+        raise AppError.unauthorized("Invalid or expired token")
+
+    if payload.get("type") != "access":
+        raise AppError.unauthorized("Not an access token")
+
+    return UUID(payload["sub"])
 
 
 async def require_project_access(
