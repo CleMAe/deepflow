@@ -130,6 +130,45 @@ TypeScript：`tsc -b` 无 upload/component/mock 相关类型错误（`vitest/glo
 
 ---
 
+---
+
+## PR Review 修复（组长审查 PR #23）
+
+提交 PR 后组长审查，发现以下问题并已修复：
+
+### Critical（已修复）
+
+1. **删除 `uploadSimple`，所有文件统一走分片流程**
+   - 后端不存在 `POST /projects/{id}/datasets/upload` 简单上传端点
+   - 修改：`upload.ts` 删除 `uploadSimple`；`FileUpload.tsx` 删除大小文件判断，统一走 `init → chunk → complete`
+   - `datasets.ts` 删除 simple upload mock handler
+
+2. **删除 experiments 不存在的 DELETE mock**
+   - 后端 OpenAPI 和实际路由均无 `DELETE /experiments/{id}`
+   - 修改：`experiments.ts` 删除该 handler
+
+### Warning（已修复）
+
+1. **MSW mock 数据结构与后端对齐**
+   - `models.ts`：`pretrained_source` 从 `'torchvision'` 改为 `'huggingface'`（与后端 schema 枚举一致）
+   - `training.ts`：`logs` 返回从对象数组 `{level,message,timestamp}` 改为字符串数组 `string[]`，与后端 `TrainingLogOut(logs=lines)` 一致
+   - `training.ts`：新增状态机验证，禁止非法状态转换（如 pause pending 的 job），与后端 `_VALID_TRANSITIONS` 对齐
+
+2. **错误码统一为 8 位规范**
+   - model not found：`40404` → `40020001`
+   - training job not found：`40404` → `50020001`
+   - invalid transition：新增 `50010001`
+   - upload not found：`40404` → `30020002`
+
+3. **CodeEditor 按钮样式统一**
+   - 格式化/压缩按钮从原生 `<button>` 改为 Ant Design `<Button size="small">`
+   - 行号区域显式设置 `overflowY: 'hidden'` 避免滚动条错位
+
+4. **删除 training.ts 死代码**
+   - 删除未使用的 `pollCounts` Map
+
+---
+
 ## 当前状态
 
-P2 Day2 P0 交付物全部完成，分支 `feat/P2-frontend` 已推送远程。前端基础设施（组件库 + MSW + 主题）已就绪，P3/P4/P5 可基于当前分支继续页面开发。
+P2 Day2 P0 交付物全部完成 + PR review 修复已推送。分支 `feat/P2-frontend` 已更新。前端基础设施（组件库 + MSW + 主题）已就绪，P3/P4/P5 可基于当前分支继续页面开发。
