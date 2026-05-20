@@ -17,7 +17,7 @@ Four-layer architecture with strict decoupling:
 
 Key decoupling: all inter-module communication via REST API (no in-process function calls). Real-time monitoring via WebSocket push (no polling). Large files shared via filesystem UUID paths, not API transfer.
 
-## Current Module Status (Day 2 — as of 2026-05-20)
+## Current Module Status (Day 3 — as of 2026-05-20)
 
 ### Progress vs Plan Summary
 
@@ -28,7 +28,7 @@ Key decoupling: all inter-module communication via REST API (no in-process funct
 - ✅ Docker Compose (app + db + frontend + gpu-train)
 - ✅ Mock services for cleaning/EDA/inference
 - ✅ FE Login/Register + Dashboard + Data management pages
-- ⚠️ P8 router骨架 merged via later PRs (not Day 1 12:00 as planned)
+- ✅ P8 router骨架 merged
 
 **Day 2 (功能日)** — Target: All P0 BE APIs return real data; FE P0 page structures complete; Agent engine core
 - ✅ Training engine: real PyTorch subprocess + state machine + checkpoint + early stopping
@@ -37,57 +37,99 @@ Key decoupling: all inter-module communication via REST API (no in-process funct
 - ✅ WebSocket: real status-file polling + diff-based push
 - ✅ Dataset upload: real UploadService + DatasetService
 - ✅ Agent engine: tech design published (`docs/backend/agent-engine-tech-design.md`)
-- ⚠️ Cleaning: still MockCleaningService (P7 — Day 2 12:00 target missed)
-- ⚠️ EDA: still mock (P7 — Day 2 12:00 target missed)
-- ⚠️ Inference: still mock (P7/P8 — Day 2 18:00 target at risk)
-- ❌ Auth API: not started (P6 — Day 1 target missed)
-- ❌ Projects CRUD: not started (P6 — Day 1 target missed)
-- ❌ Agent implementation: not started (P1 — Day 2 18:00 target)
+- ✅ Auth API: real JWT auth (login/register/refresh/me) — merged PR #22
+- ✅ Projects CRUD: full CRUD with ownership scoping — merged PR #22
+- ✅ CI pipeline: GitHub Actions lint + integration test + Docker build — on `feat/day2-devops` branch
+- ✅ API integration tests: auth/projects/datasets — on `feat/day2-devops` branch
+- ❌ Cleaning: still MockCleaningService
+- ❌ EDA: still mock
+- ❌ Inference: still mock
+- ❌ Agent implementation: not started
+- ❌ P3/P4 FE pages: still placeholders (Cleaning/EDA, Models, Training)
+
+**Day 3 (集成日) — in progress**
+- ✅ P6 Auth+Projects API shipped
+- ❌ P9 CI+tests on `feat/day2-devops` branch, not yet merged to main
+- ❌ P7 cleaning/EDA real engine
+- ❌ P3/P4 real FE pages
+- ❌ P1 Agent implementation
+- ❌ P8 inference engine
 
 ### Backend (merged to main)
 
-| Module | Path | Status | Plan Target | Gap |
-|--------|------|--------|-------------|-----|
-| Dataset upload/CRUD | `src/app/api/v1/datasets/` | ✅ Real (UploadService + DatasetService) | Day 1 | — |
-| Data cleaning | `src/app/api/v1/cleaning/` | ⚠️ Mock (`MockCleaningService`) | Day 2 12:00 | **P7 behind** — pandas engine not started |
-| EDA | `src/app/api/v1/eda/` | ⚠️ Mock (no real computation) | Day 2 12:00 | **P7 behind** — stats engine not started |
-| Inference | `src/app/api/v1/inference/` | ⚠️ Mock endpoints | Day 2 18:00 | **P7/P8 at risk** — no real inference yet |
-| Training jobs | `src/app/api/v1/training/` | ✅ Real (PyTorch subprocess + state machine + checkpoint + early stopping) | Day 2 12:00 | — |
-| Model library | `src/app/api/v1/models/` | ✅ Real (SQLAlchemy CRUD + 6 architectures) | Day 1 | — |
-| Experiments | `src/app/api/v1/experiments/` | ✅ Real (CRUD + comparison + auto-create) | Day 2 | — |
-| WebSocket | `src/app/api/v1/ws/` | ✅ Real (status-file polling + diff-based push) | Day 2 12:00 | — |
-| Auth | — | ❌ Not started | Day 1 14:00 | **P6 behind** — no auth router |
-| Projects | — | ❌ Not started | Day 1 14:00 | **P6 behind** — no projects router |
-| Agent | — | ❌ Not started (design doc only) | Day 2 18:00 | **P1 at risk** — implementation pending |
+| Module | Path | Status | Gap |
+|--------|------|--------|-----|
+| Dataset upload/CRUD | `src/app/api/v1/datasets/` | ✅ Real (UploadService + DatasetService) | — |
+| Data cleaning | `src/app/api/v1/cleaning/` | ❌ Mock (`MockCleaningService`) | P7 — pandas engine not started |
+| EDA | `src/app/api/v1/eda/` | ❌ Mock (no real computation) | P7 — stats engine not started |
+| Inference | `src/app/api/v1/inference/` | ❌ Mock endpoints | P8 — no real inference yet |
+| Training jobs | `src/app/api/v1/training/` | ✅ Real (PyTorch subprocess + state machine + checkpoint + early stopping) | — |
+| Model library | `src/app/api/v1/models/` | ✅ Real (SQLAlchemy CRUD + 6 architectures) | — |
+| Experiments | `src/app/api/v1/experiments/` | ✅ Real (CRUD + comparison + auto-create) | — |
+| WebSocket | `src/app/api/v1/ws/` | ✅ Real (status-file polling + diff-based push) | — |
+| Auth | `src/app/api/v1/auth/` | ✅ Real (JWT login/register/refresh/me + bcrypt) | — |
+| Projects | `src/app/api/v1/projects/` | ✅ Real (CRUD + ownership scoping + pagination) | — |
+| Agent | — | ❌ Not started (design doc only) | P1 — implementation pending |
+
+### DevOps & Testing (on `feat/day2-devops` branch, not yet merged to main)
+
+| Item | Path | Status |
+|------|------|--------|
+| CI pipeline | `.github/workflows/ci.yml` | ✅ lint + integration-test + Docker build (170 lines) |
+| Auth API tests | `backend/tests/api/test_auth.py` | ✅ 197 lines — login/register/refresh/me + error cases |
+| Projects API tests | `backend/tests/api/test_projects.py` | ✅ 221 lines — CRUD + ownership + pagination |
+| Datasets API tests | `backend/tests/api/test_datasets.py` | ✅ 345 lines — upload + CRUD + preview |
+| Test factories | `backend/tests/factories/` | ✅ user/project/dataset factories |
+| Docker fixes | `docker/backend/Dockerfile` | ✅ deps path alignment |
 
 ### Frontend (merged to main)
 
-| Page | Path | Status | Plan Target | Gap |
-|------|------|--------|-------------|-----|
-| Dashboard | `DashboardPage.tsx` | ✅ Complete | Day 1 | — |
-| Login/Register | `LoginPage.tsx` / `RegisterPage.tsx` | ✅ Complete | Day 1 | — |
-| Data management | `ProjectDataPage.tsx` | ✅ Upload + list (basic) | Day 2 12:00 | — |
-| Cleaning & EDA | `ProjectCleaningPage.tsx` | ❌ Placeholder (3 tab labels only) | Day 2 12:00 | **P3 behind** — no real UI |
-| Model building | `ProjectModelsPage.tsx` | ❌ Placeholder (1 line text) | Day 2 12:00 | **P4 behind** — no real UI |
-| Training monitoring | `ProjectTrainingPage.tsx` | ❌ Placeholder (1 line text) | Day 2 12:00 | **P4 behind** — no real UI |
-| Inference testing | `ProjectInferencePage.tsx` | ✅ Evaluation + online test + batch + confusion matrix | Day 2 12:00 | — |
-| Agent management | `ProjectAgentsPage.tsx` | ✅ Dialog + tool binding UI | Day 2 | — |
+| Page | Path | Status | Gap |
+|------|------|--------|-----|
+| Dashboard | `DashboardPage.tsx` | ✅ Complete | — |
+| Login/Register | `LoginPage.tsx` / `RegisterPage.tsx` | ✅ Complete | — |
+| Data management | `ProjectDataPage.tsx` | ✅ Upload + list (basic) | — |
+| Cleaning & EDA | `ProjectCleaningPage.tsx` | ❌ Placeholder (3 tab labels only) | P3 — no real UI |
+| Model building | `ProjectModelsPage.tsx` | ❌ Placeholder (1 line text) | P4 — no real UI |
+| Training monitoring | `ProjectTrainingPage.tsx` | ❌ Placeholder (1 line text) | P4 — no real UI |
+| Inference testing | `ProjectInferencePage.tsx` | ✅ Evaluation + online test + batch + confusion matrix | — |
+| Agent management | `ProjectAgentsPage.tsx` | ✅ Dialog + tool binding UI | — |
 
-### Day 2 Remaining Milestones (at risk)
+**Note**: P2 frontend PR #23 added CodeEditor, CommonModal, MSW handlers (models/training/experiments), Ant Design theme, and FileUpload chunk upload — but some of these were reverted on the `feat/day2-devops` branch. The main branch has the P2 additions.
 
-| Time | Milestone | Status |
-|------|-----------|--------|
-| Day 2 12:00 | P7: cleaning engine + EDA stats done | ⚠️ Not met |
-| Day 2 14:00 | P7: augmentation done; P8: WebSocket + checkpoint + early stopping done | ⚠️ Partially met (P8 done, P7 not) |
-| Day 2 18:00 | 🔴 M2: All P0 BE APIs return real data; FE page structures complete | ❌ Not met — cleaning/EDA/inference still mock, 3 FE pages still placeholder |
-| Day 2 18:00 | Agent engine FastAPI tool wrapping core complete | ❌ Not met — only design doc |
+### Feature Completion Summary
+
+**Backend (7/11 done)**
+- ✅ Dataset upload/CRUD
+- ✅ Training jobs (subprocess + state machine + checkpoint + early stopping)
+- ✅ Model library (6 architectures)
+- ✅ Experiments (CRUD + comparison + auto-create)
+- ✅ WebSocket (status-file polling + diff-based push)
+- ✅ Auth (JWT login/register/refresh/me)
+- ✅ Projects (CRUD + ownership scoping)
+- ❌ Data cleaning (still mock)
+- ❌ EDA (still mock)
+- ❌ Inference (still mock)
+- ❌ Agent (design doc only)
+
+**Frontend (5/8 done)**
+- ✅ Dashboard
+- ✅ Login/Register
+- ✅ Data management
+- ✅ Inference testing
+- ✅ Agent management
+- ❌ Cleaning & EDA (placeholder)
+- ❌ Model building (placeholder)
+- ❌ Training monitoring (placeholder)
 
 ### Key Blockers
 
-1. **P6 (Auth + Projects)**: No auth or projects API — Day 1 deliverable still missing. Blocks `require_project_access` from doing real auth checks.
-2. **P7 (Cleaning + EDA)**: Both Day 2 12:00 targets missed. Blocks P0 P0 full pipeline (upload→clean→model→train→infer).
-3. **P3 (Cleaning/EDA FE)**: Page still placeholder. Day 2 12:00 target missed.
-4. **P4 (Model + Training FE)**: Both pages still placeholder. Day 2 12:00 target missed.
+1. **P7 (Cleaning + EDA)**: Still mock. P7 branch (`feature/p7`) is stale and hasn't merged latest main. Blocks the P0 full pipeline (upload→clean→model→train→infer).
+2. **P3 (Cleaning/EDA FE)**: Page still placeholder. Blocks end-to-end data flow testing.
+3. **P4 (Model + Training FE)**: Both pages still placeholder. Blocks training workflow testing.
+4. **P8 (Inference)**: Still mock. Needed for Agent tool wrapping.
+5. **P1 (Agent)**: Design doc only, no implementation. Highest priority feature per plan.
+6. **P9 (CI/tests)**: On `feat/day2-devops` branch but not yet merged to main — needs PR and review.
 
 ## Source Code Layout
 
@@ -113,11 +155,12 @@ src/
 │   ├── main.py              # FastAPI app (lifespan, CORS, /api/v1/health with DB check)
 │   ├── api/
 │   │   ├── deps.py          # DI: get_storage, get_dataset_service, get_training_service, etc.
-│   │   └── v1/              # Routers by module
+│   │   └── v1/              # Routers by module (auth, projects, datasets, cleaning, eda, inference, training, models, experiments, ws)
 │   ├── core/
 │   │   ├── config.py        # Re-exports src.infra.config.settings
 │   │   ├── errors.py        # 8-digit error codes (10=auth .. 90=system) + AppError
 │   │   ├── response.py      # success() / failure() helpers
+│   │   ├── security.py      # JWT creation/verification + bcrypt password hashing
 │   │   └── exception_handlers.py
 │   ├── schemas/             # Pydantic request/response models
 │   ├── services/            # Business logic
@@ -128,13 +171,13 @@ src/
 │       └── seed.py          # Demo data seeding
 ├── shared/
 │   └── protocols.py         # Inter-module Protocol interfaces (frozen Day 1)
-├── agent/                   # Agent engine (P1 — not yet implemented)
-│   ├── router.py            #   11 API endpoints
-│   ├── service.py           #   Agent business logic
-│   ├── chat_engine.py       #   SSE streaming + tool-call loop
-│   ├── tool_wrapper.py      #   Model → OpenAI function-calling tool
-│   ├── llm_provider.py      #   LiteLLMProvider + MockLLMProvider
-│   └── prompt_manager.py    #   Template CRUD + $variable rendering
+├── agent/                   # Agent engine (P1 — not yet implemented, no directory yet)
+│   ├── router.py            #   11 API endpoints (planned)
+│   ├── service.py           #   Agent business logic (planned)
+│   ├── chat_engine.py       #   SSE streaming + tool-call loop (planned)
+│   ├── tool_wrapper.py      #   Model → OpenAI function-calling tool (planned)
+│   ├── llm_provider.py      #   LiteLLMProvider + MockLLMProvider (planned)
+│   └── prompt_manager.py    #   Template CRUD + $variable rendering (planned)
 frontend/
 ├── src/
 │   ├── pages/               # React page components
@@ -147,7 +190,7 @@ frontend/
 
 The single source of truth is `docs/api/openapi.yaml` (maintained by P1/Tech Lead), frozen on Day 1. All endpoints use prefix `/api/v1`. Responses follow `{code, message, data, request_id}`. Pagination is `{page, page_size, total, items[]}`. Errors use 8-digit codes `XX-YY-ZZZ` (module + category + sequence). Auth via `Authorization: Bearer <JWT>`.
 
-Current route count: **53 registered endpoints** across datasets, cleaning, EDA, inference, training, models, experiments, WebSocket, and health. Agent endpoints (11) not yet implemented — see `docs/backend/agent-engine-tech-design.md`.
+Current route count: **55 registered endpoints** (54 REST + 1 WebSocket) across auth, projects, datasets, cleaning, EDA, inference, training, models, experiments, WebSocket, and health. Agent endpoints (11) not yet implemented — see `docs/backend/agent-engine-tech-design.md`.
 
 ## Error Code Modules
 
@@ -232,16 +275,17 @@ Each role's Claude Code prompt is in `prompts/P{n}_*.md`.
 
 ## Day 3 Action Items (Critical)
 
-Day 3 is **集成日** — the plan requires P0 full pipeline end-to-end by 12:00. Given Day 2 gaps:
+Day 3 is **集成日** — the plan requires P0 full pipeline end-to-end. Auth+Projects are now done, but major gaps remain:
 
-1. **P6 must ship Auth + Projects API today** — otherwise `require_project_access` stays as no-op and Day 3 integration cannot verify real auth flow
-2. **P7 must ship cleaning engine + EDA today** — this is the Day 2 12:00 deliverable that is already 1 day late; blocks the upload→clean→model pipeline
-3. **P3/P4 must ship real FE pages today** — Cleaning/EDA, Model building, Training monitoring are all still placeholders; Day 3 09:00-12:00 is the FE Mock→Real API switch window
-4. **P1 must start Agent engine implementation** — Phase 1 (CRUD + tool binding) today; Phase 2 (SSE chat engine) Day 3 evening
-5. **P8 must ship real inference engine** — online_inference at minimum; needed for Agent tool wrapping
-6. **P9: integration test pass** — first automated integration test was scheduled Day 2 18:00; not yet run
+1. **P9 must merge `feat/day2-devops` to main** — CI pipeline + API tests are ready but unmerged
+2. **P7 must ship cleaning engine + EDA** — P7 branch is stale and needs rebase; blocks the upload→clean→model pipeline
+3. **P3 must ship Cleaning/EDA FE page** — still placeholder
+4. **P4 must ship Model building + Training monitoring FE pages** — both still placeholder
+5. **P1 must start Agent engine implementation** — Phase 1 (CRUD + tool binding); Phase 2 (SSE chat engine). No `src/agent/` directory exists yet.
+6. **P8 must ship real inference engine** — online_inference at minimum; needed for Agent tool wrapping
+7. **P9: integration test pass** — CI exists but not yet run on main
 
-If any P0 module is still mock by Day 3 18:00, apply priority cut order from plan section 6.3.
+If any P0 module is still mock by Day 3 end, apply priority cut order from plan section 6.3.
 
 ## Priority Rule
 
