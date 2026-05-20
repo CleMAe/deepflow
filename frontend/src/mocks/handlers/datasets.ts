@@ -1,22 +1,29 @@
 import { http, HttpResponse } from 'msw'
 
+import {
+  DEMO_DATASET_CSV_ID,
+  DEMO_DATASET_IMAGE_ID,
+  DEMO_PROJECT_ID,
+  MOCK_ALT_PROJECT_ID,
+} from '@/mocks/demoIds'
+
 const mockDatasets = [
   {
-    id: 'ds-1',
+    id: DEMO_DATASET_IMAGE_ID,
     name: 'train_images_v1',
-    project_id: 'proj-1',
+    project_id: MOCK_ALT_PROJECT_ID,
     format: 'image',
-    file_path: '/projects/proj-1/datasets/ds-1',
+    file_path: `/projects/${MOCK_ALT_PROJECT_ID}/datasets/${DEMO_DATASET_IMAGE_ID}`,
     num_samples: 5000,
     status: 'ready',
     created_at: '2026-05-18T10:00:00Z',
   },
   {
-    id: 'ds-2',
+    id: DEMO_DATASET_CSV_ID,
     name: 'sales_data_2025',
-    project_id: 'proj-2',
+    project_id: DEMO_PROJECT_ID,
     format: 'csv',
-    file_path: '/projects/proj-2/datasets/ds-2',
+    file_path: `/projects/${DEMO_PROJECT_ID}/datasets/${DEMO_DATASET_CSV_ID}`,
     num_samples: 12000,
     status: 'ready',
     created_at: '2026-05-18T11:00:00Z',
@@ -26,15 +33,17 @@ const mockDatasets = [
 const uploadSessions = new Map<string, { received_chunks: number[]; total_chunks: number }>()
 
 export const datasetHandlers = [
-  http.get('/api/v1/projects/:projectId/datasets', () => {
+  http.get('/api/v1/projects/:projectId/datasets', ({ params }) => {
+    const projectId = params.projectId as string
+    const items = mockDatasets.filter((d) => d.project_id === projectId)
     return HttpResponse.json({
       code: 0,
       message: 'success',
       data: {
         page: 1,
         page_size: 20,
-        total: mockDatasets.length,
-        items: mockDatasets,
+        total: items.length,
+        items,
       },
       request_id: 'mock-req-8',
     })
@@ -62,7 +71,7 @@ export const datasetHandlers = [
     })
   }),
 
-  http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/chunk', async ({ params }) => {
+  http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/chunk', async ({ params, request }) => {
     const session = uploadSessions.get(params.uploadId as string)
     if (!session) {
       return HttpResponse.json({ code: 30020002, message: 'Upload session not found' }, { status: 404 })
@@ -87,10 +96,11 @@ export const datasetHandlers = [
     }
     const body = (await request.json()) as { dataset_name?: string }
     uploadSessions.delete(params.uploadId as string)
+    const newId = globalThis.crypto?.randomUUID?.() ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0').slice(0, 12)}`
     const newDs = {
-      id: `ds-${Math.random().toString(36).slice(2)}`,
+      id: newId,
       name: body.dataset_name || 'uploaded_dataset',
-      project_id: params.projectId,
+      project_id: String(params.projectId),
       format: 'csv',
       file_path: `/projects/${params.projectId}/datasets/new`,
       num_samples: 0,

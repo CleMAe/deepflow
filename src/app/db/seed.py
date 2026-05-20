@@ -13,6 +13,8 @@ from src.infra.db.models.user import User, UserRole
 
 DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEMO_PROJECT_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+DEMO_DATASET_CSV_ID = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1")
+DEMO_DATASET_IMAGE_ID = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2")
 
 DEMO_USER = {
     "username": "demo",
@@ -72,6 +74,6 @@ def seed_demo_datasets(db: Session) -> None:
             "status": DatasetStatus.READY,
         },
     ]
-    for item in samples:
-        db.add(Dataset(project_id=DEMO_PROJECT_ID, **item))
+    db.add(Dataset(id=DEMO_DATASET_CSV_ID, project_id=DEMO_PROJECT_ID, **samples[0]))
+    db.add(Dataset(id=DEMO_DATASET_IMAGE_ID, project_id=DEMO_PROJECT_ID, **samples[1]))
     db.commit()

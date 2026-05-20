@@ -1,10 +1,32 @@
-import { Card, Tabs } from 'antd'
+import { Card, Empty, Tabs } from 'antd'
+import { useParams } from 'react-router-dom'
+import AugmentationTab from '@/components/p3-data/AugmentationTab'
+import CleaningOperationsTab from '@/components/p3-data/CleaningOperationsTab'
+import EdaReportTab from '@/components/p3-data/EdaReportTab'
 
 export default function ProjectCleaningPage() {
+  const { projectId } = useParams()
+
+  if (!projectId) {
+    return <Empty description="缺少项目 ID" />
+  }
+
   const items = [
-    { key: 'clean', label: '数据清洗', children: <p>缺失值 / 异常值 / 去重 / 编码转换（P3 待实现）</p> },
-    { key: 'eda', label: 'EDA 报告', children: <p>统计概览与可视化（P3 待实现）</p> },
-    { key: 'augment', label: '数据增强', children: <p>CV 增强参数配置（P3 待实现）</p> },
+    {
+      key: 'clean',
+      label: '数据清洗',
+      children: <CleaningOperationsTab projectId={projectId} />,
+    },
+    {
+      key: 'eda',
+      label: 'EDA 报告',
+      children: <EdaReportTab projectId={projectId} />,
+    },
+    {
+      key: 'augment',
+      label: '数据增强',
+      children: <AugmentationTab projectId={projectId} />,
+    },
   ]
 
   return (
