@@ -12,8 +12,6 @@ class Settings(BaseSettings):
     # Day1 dev: allow calls without JWT; set False before integration with P6 gateway
     dev_allow_anonymous: bool = True
     default_chunk_size: int = 5 * 1024 * 1024
-    jwt_secret_key: str = "dev-jwt-secret-change-me-32chars-min"
-    jwt_algorithm: str = "HS256"
 
 
 settings = Settings()

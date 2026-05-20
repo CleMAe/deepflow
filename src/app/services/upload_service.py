@@ -8,12 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.core.config import settings
-from app.core.errors import (
-    ERR_DATASET_FORBIDDEN,
-    ERR_UPLOAD_INCOMPLETE,
-    ERR_UPLOAD_NOT_FOUND,
-    AppError,
-)
+from app.core.errors import AppError, ERR_UPLOAD_INCOMPLETE, ERR_UPLOAD_NOT_FOUND
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import UploadCompleteRequest, UploadInitRequest, UploadSessionSchema
 from shared.protocols import StorageProtocol
@@ -126,10 +121,7 @@ class UploadService:
     ):
         state = self._get_session(upload_id)
         if state.project_id != project_id:
-            raise AppError.forbidden(
-                "Upload session does not belong to this project",
-                code=ERR_DATASET_FORBIDDEN,
-            )
+            raise AppError.forbidden("Upload session does not belong to this project")
         if len(state.received_chunks) < body.total_chunks:
             raise AppError.bad_request(
                 "Not all chunks received",

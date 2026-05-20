@@ -8,19 +8,17 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.errors import ERR_AUTH_INVALID, ERR_PROJECT_FORBIDDEN, ERR_PROJECT_NOT_FOUND, AppError
-from app.core.security import decode_token
+from app.core.errors import AppError
 from app.db.session import get_db
 from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
 from app.services.dataset_service import DatasetService
 from app.services.storage_mock import MockFileStorage
 from app.services.upload_service import UploadService
-from shared.protocols import StorageProtocol
-from src.infra.db.models.project import Project
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -57,37 +55,22 @@ def get_cleaning_service(
     return MockCleaningService(repo, storage, datasets)
 
 
-async def get_current_user(
+async def get_current_user_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UUID:
-    """Decode JWT access token and return current user id."""
+    """P6 `AuthProtocol` placeholder — rejects missing token when anonymous dev mode is off."""
     if settings.dev_allow_anonymous:
         return UUID("00000000-0000-0000-0000-000000000001")
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AppError.unauthorized("Missing or invalid Authorization header")
-    try:
-        payload = decode_token(credentials.credentials, expected_type="access")
-    except ValueError as exc:
-        raise AppError.unauthorized("Invalid or expired token", code=ERR_AUTH_INVALID) from exc
-    return UUID(str(payload["sub"]))
-
-
-async def get_current_user_id(
-    user_id: Annotated[UUID, Depends(get_current_user)],
-) -> UUID:
-    """Alias kept for existing dataset routes."""
-    return user_id
+    # Day3: decode JWT via P6
+    return UUID("00000000-0000-0000-0000-000000000001")
 
 
 async def require_project_access(
     project_id: UUID,
     user_id: Annotated[UUID, Depends(get_current_user_id)],
-    db: Session = Depends(get_db),
 ) -> UUID:
-    """Ensure the current user owns the project (RBAC)."""
-    project = db.get(Project, project_id)
-    if project is None:
-        raise AppError.not_found("Project not found", code=ERR_PROJECT_NOT_FOUND)
-    if project.owner_id != user_id:
-        raise AppError.forbidden("No access to this project", code=ERR_PROJECT_FORBIDDEN)
+    """P6 RBAC placeholder — Day3 check project membership."""
+    _ = user_id
     return project_id
