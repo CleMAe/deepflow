@@ -80,6 +80,15 @@ def _test_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from src.infra.config import get_settings
 
     get_settings.cache_clear()
+    new_settings = get_settings()
+
+    import app.api.deps as _deps
+    import app.core.config as _app_cfg
+    import app.core.security as _security
+    import src.infra.config as _infra_cfg
+
+    for mod in (_infra_cfg, _app_cfg, _deps, _security):
+        monkeypatch.setattr(mod, "settings", new_settings)
 
 
 @pytest.fixture(scope="session")
