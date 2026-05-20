@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-
-from src.infra.db.models import Dataset
 
 from app.schemas.dataset import ColumnMetaSchema, DatasetSchema
+from src.infra.db.models import Dataset
 
 
 def _normalize_columns_meta(raw: list | dict | None) -> list[ColumnMetaSchema]:

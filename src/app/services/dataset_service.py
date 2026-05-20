@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 
 from app.core.errors import AppError
-from src.infra.db.models import Dataset
 from app.mappers.dataset_mapper import file_size_if_exists, row_to_dataset_schema
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.dataset import (
@@ -15,13 +14,21 @@ from app.schemas.dataset import (
     PaginatedDatasets,
     PaginatedImages,
 )
-from shared.protocols import StorageProtocol
+from app.services.data_parser import PandasDataParser
+from shared.protocols import DataParserProtocol, DatasetFormat, StorageProtocol
+from src.infra.db.models import Dataset
 
 
 class DatasetService:
-    def __init__(self, repo: DatasetRepository, storage: StorageProtocol) -> None:
+    def __init__(
+        self,
+        repo: DatasetRepository,
+        storage: StorageProtocol,
+        parser: DataParserProtocol | None = None,
+    ) -> None:
         self._repo = repo
         self._storage = storage
+        self._parser = parser or PandasDataParser()
 
     def _require_row(self, project_id: uuid.UUID, dataset_id: uuid.UUID) -> Dataset:
         row = self._repo.get_by_id_and_project(dataset_id, project_id)
@@ -81,15 +88,27 @@ class DatasetService:
 
     def preview(self, project_id: uuid.UUID, dataset_id: uuid.UUID, limit: int = 100) -> DatasetPreviewSchema:
         row = self._require_row(project_id, dataset_id)
-        columns = ["col_a", "col_b"]
-        rows = [{"col_a": 1, "col_b": 2}]
-        if row.columns_meta:
+        file_path = row.file_path or ""
+        fmt_value = row.format.value if hasattr(row.format, "value") else str(row.format)
+
+        if fmt_value not in ("csv", "json") or not file_path:
             from app.mappers.dataset_mapper import _normalize_columns_meta
 
-            cols = _normalize_columns_meta(row.columns_meta)
-            if cols:
+            columns: list[str] = []
+            if row.columns_meta:
+                cols = _normalize_columns_meta(row.columns_meta)
                 columns = [c.name for c in cols]
-        return DatasetPreviewSchema(columns=columns, rows=rows[:limit], total_rows=row.num_samples or len(rows), limit=limit)
+            return DatasetPreviewSchema(
+                columns=columns,
+                rows=[],
+                total_rows=row.num_samples or 0,
+                limit=limit,
+            )
+
+        ds_format = DatasetFormat(fmt_value)
+        columns, rows = self._parser.parse(file_path, ds_format, limit=limit)
+        total_rows = row.num_samples or self._parser.count_rows(file_path, ds_format)
+        return DatasetPreviewSchema(columns=columns, rows=rows, total_rows=total_rows, limit=limit)
 
     def list_images(self, project_id: uuid.UUID, dataset_id: uuid.UUID, page: int, page_size: int) -> PaginatedImages:
         self._require_row(project_id, dataset_id)

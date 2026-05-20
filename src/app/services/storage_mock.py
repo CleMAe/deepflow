@@ -6,9 +6,8 @@ import os
 import uuid
 from pathlib import Path
 
-from shared.protocols import StorageProtocol
-
 from app.core.config import settings
+from shared.protocols import StorageProtocol
 
 
 class MockFileStorage(StorageProtocol):
