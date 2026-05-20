@@ -52,6 +52,13 @@ ERR_INFERENCE_INVALID_PARAM = error_code(60, 1, 1)
 # ── Agent (70) ───────────────────────────────────────────────
 ERR_AGENT_NOT_FOUND = error_code(70, 2, 1)
 ERR_AGENT_INVALID_PARAM = error_code(70, 1, 1)
+ERR_AGENT_INVALID_STATUS = error_code(70, 1, 2)
+ERR_AGENT_TOOL_NOT_FOUND = error_code(70, 2, 2)
+ERR_AGENT_FORBIDDEN = error_code(70, 3, 1)
+ERR_AGENT_TOOL_BIND_FAILED = error_code(70, 4, 1)
+ERR_AGENT_CHAT_FAILED = error_code(70, 4, 2)
+ERR_AGENT_TOOL_ROUND_LIMIT = error_code(70, 4, 3)
+ERR_AGENT_PROMPT_RENDER_FAILED = error_code(70, 4, 4)
 
 # ── System / Infra (90) ──────────────────────────────────────
 ERR_SYSTEM_DB_UNAVAILABLE = error_code(90, 5, 1)

@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     mock_mode: bool = True
     dev_allow_anonymous: bool = True
 
+    # LLM / Agent
+    llm_default_provider: str = "mock"
+    llm_default_model: str = "gpt-4"
+    llm_api_key: str = ""
+    llm_api_base: str = ""
+    agent_max_tool_rounds: int = 5
+    agent_max_history_messages: int = 50
+
     # Upload
     default_chunk_size: int = 5 * 1024 * 1024  # 5 MiB
 
