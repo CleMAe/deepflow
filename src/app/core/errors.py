@@ -28,26 +28,25 @@ ERR_AUTH_USERNAME_EXISTS = error_code(10, 4, 1)
 # ── Project (20) ─────────────────────────────────────────────
 ERR_PROJECT_NOT_FOUND = error_code(20, 2, 1)
 ERR_PROJECT_INVALID_PARAM = error_code(20, 1, 1)
-ERR_PROJECT_PERMISSION = error_code(20, 3, 1)
+ERR_PROJECT_FORBIDDEN = error_code(20, 3, 1)
 
 # ── Dataset (30) ─────────────────────────────────────────────
 ERR_DATASET_NOT_FOUND = error_code(30, 2, 1)
 ERR_DATASET_INVALID_PARAM = error_code(30, 1, 1)
+ERR_DATASET_FORBIDDEN = error_code(30, 3, 1)
 ERR_UPLOAD_NOT_FOUND = error_code(30, 2, 2)
 ERR_UPLOAD_INCOMPLETE = error_code(30, 4, 1)
-ERR_PROJECT_FORBIDDEN = error_code(30, 3, 1)
 
 # ── Model (40) ───────────────────────────────────────────────
 ERR_MODEL_NOT_FOUND = error_code(40, 2, 1)
 ERR_MODEL_INVALID_PARAM = error_code(40, 1, 1)
 
 # ── Training (50) ────────────────────────────────────────────
-ERR_TRAINING_NOT_FOUND = error_code(50, 2, 1)
-ERR_TRAINING_INVALID_PARAM = error_code(50, 1, 1)
-ERR_TRAINING_STATUS = error_code(50, 4, 1)
+ERR_TRAINING_JOB_NOT_FOUND = error_code(50, 2, 1)
+ERR_TRAINING_INVALID_TRANSITION = error_code(50, 1, 1)
 
 # ── Inference (60) ───────────────────────────────────────────
-ERR_INFERENCE_NOT_FOUND = error_code(60, 2, 1)
+ERR_INFERENCE_TASK_NOT_FOUND = error_code(60, 2, 1)
 ERR_INFERENCE_INVALID_PARAM = error_code(60, 1, 1)
 
 # ── Agent (70) ───────────────────────────────────────────────

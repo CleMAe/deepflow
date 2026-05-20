@@ -44,6 +44,7 @@ def warn_if_insecure_jwt_secret() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     warn_if_insecure_jwt_secret()
+    import src.infra.db.models  # noqa: F401 — register all models with Base.metadata
     init_db()
     with closing(get_db()) as db_gen:
         db = next(db_gen)
