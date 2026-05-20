@@ -2,12 +2,19 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_dataset_service, require_project_access
+from app.api.deps import (
+    get_augmentation_service,
+    get_dataset_service,
+    get_eda_service,
+    require_project_access,
+)
 from app.core.response import success
 from app.schemas.eda import AugmentRequest, EdaRequest, SplitRequest, SplitResultSchema
+from app.services.augmentation_service import PillowAugmentationService
 from app.services.dataset_service import DatasetService
+from app.services.eda_service import PandasEdaService
 
-router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}", tags=["Cleaning"])
+router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}", tags=["EDA"])
 
 
 @router.post("/eda")
@@ -16,14 +23,14 @@ async def trigger_eda(
     ds_id: UUID,
     body: EdaRequest,
     _: UUID = Depends(require_project_access),
-    svc: DatasetService = Depends(get_dataset_service),
+    eda: PandasEdaService = Depends(get_eda_service),
 ):
-    svc.get(project_id, ds_id)
+    report = eda.run_eda(project_id, ds_id, body)
     return success(
         {
-            "dataset_id": str(ds_id),
+            "dataset_id": report["dataset_id"],
             "status": "completed",
-            "message": "EDA job queued (mock)",
+            "message": "EDA completed",
             "include_visualizations": body.include_visualizations,
         }
     )
@@ -34,19 +41,9 @@ async def get_eda_report(
     project_id: UUID,
     ds_id: UUID,
     _: UUID = Depends(require_project_access),
-    svc: DatasetService = Depends(get_dataset_service),
+    eda: PandasEdaService = Depends(get_eda_service),
 ):
-    svc.get(project_id, ds_id)
-    return success(
-        {
-            "dataset_id": str(ds_id),
-            "summary": {"num_rows": 150, "num_columns": 5, "num_missing": 0, "duplicate_rows": 0},
-            "column_stats": [],
-            "correlations": {},
-            "visualizations": [],
-            "created_at": "2026-05-19T00:00:00Z",
-        }
-    )
+    return success(eda.get_report(project_id, ds_id))
 
 
 @router.post("/augment")
@@ -55,17 +52,10 @@ async def augment_dataset(
     ds_id: UUID,
     body: AugmentRequest,
     _: UUID = Depends(require_project_access),
-    svc: DatasetService = Depends(get_dataset_service),
+    augment: PillowAugmentationService = Depends(get_augmentation_service),
 ):
-    source = svc.get(project_id, ds_id)
-    return success(
-        {
-            "original_count": source.num_samples,
-            "augmented_count": source.num_samples * body.num_augmented,
-            "new_dataset_id": str(uuid4()),
-            "output_dataset_name": body.output_dataset_name or f"{source.name}_aug",
-        }
-    )
+    result = augment.augment(project_id, ds_id, body)
+    return success(result)
 
 
 @router.post("/split")
@@ -76,6 +66,7 @@ async def split_dataset(
     _: UUID = Depends(require_project_access),
     svc: DatasetService = Depends(get_dataset_service),
 ):
+    # Day3 placeholder: returns counts and UUIDs only; does not write split files to disk.
     source = svc.get(project_id, ds_id)
     n = source.num_samples or 100
     train_r = body.ratios.train

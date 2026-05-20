@@ -22,6 +22,31 @@ from app.services.upload_service import UploadService
 router = APIRouter(prefix="/projects/{project_id}/datasets", tags=["Datasets"])
 
 
+@router.post("/upload", status_code=201)
+async def simple_upload_dataset(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    tags: str | None = Form(None),
+    _: UUID = Depends(require_project_access),
+    uploads: UploadService = Depends(get_upload_service),
+):
+    # V1.0: loads entire body into memory (limit enforced in UploadService, max 500MB).
+    # Future: stream chunks to disk to avoid large in-memory buffers.
+    data = await file.read()
+    tag_list: list[str] = []
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    row = uploads.simple_upload(
+        project_id,
+        filename=file.filename or "upload.bin",
+        data=data,
+        name=name,
+        tags=tag_list or None,
+    )
+    return success(row_to_dataset_schema(row).model_dump(mode="json"))
+
+
 @router.post("/upload/init", dependencies=[])
 async def init_upload(
     project_id: UUID,
