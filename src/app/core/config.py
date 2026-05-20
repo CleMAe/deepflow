@@ -1,17 +1,22 @@
+"""App-layer settings — delegates to canonical infra config with module-specific defaults."""
+
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Re-export the canonical infra settings so existing imports keep working.
+# P6 owns `src/infra/config.py` as the single source of truth for DB, auth, storage.
+from src.infra.config import settings  # noqa: F401
 
-class Settings(BaseSettings):
+
+class AppSettings(BaseSettings):
+    """Module-specific settings that don't belong in the canonical infra layer.
+
+    Only add settings here that are truly P7/P8-specific and should NOT
+    be shared across all BE modules.
+    """
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "DeepFlow Data API (P7)"
-    api_v1_prefix: str = "/api/v1"
-    storage_root: str = "./storage"
-    database_url: str = "sqlite:///./storage/deepflow_p7.db"
-    mock_mode: bool = True
-    # Day1 dev: allow calls without JWT; set False before integration with P6 gateway
-    dev_allow_anonymous: bool = True
-    default_chunk_size: int = 5 * 1024 * 1024
-
-
-settings = Settings()
+    # No module-specific settings yet — all current settings live in infra config.
+    pass
