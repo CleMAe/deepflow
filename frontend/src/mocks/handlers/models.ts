@@ -131,6 +131,20 @@ export const modelsHandlers = [
     return apiOk(updated)
   }),
 
+  http.delete('/api/v1/projects/:projectId/models/:mId', ({ params }) => {
+    const idx = projectModels.findIndex((m) => m.id === params.mId && m.project_id === params.projectId)
+    if (idx === -1) {
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
+    }
+    projectModels.splice(idx, 1)
+    return HttpResponse.json(
+      { code: 0, message: 'deleted', data: null, request_id: 'mock-p4-delete' }
+    )
+  }),
+
   http.post('/api/v1/projects/:projectId/models/:mId/validate', async ({ request }) => {
     const payload = (await request.json()) as ModelValidateRequest
     const cfg = payload.params_cfg ?? {}
@@ -154,6 +168,20 @@ export const modelsHandlers = [
       valid: errors.length === 0,
       errors,
       warnings,
+    })
+  }),
+
+  http.post('/api/v1/projects/:projectId/models/:mId/pretrained', async ({ params }) => {
+    const model = projectModels.find((m) => m.id === params.mId && m.project_id === params.projectId)
+    if (!model) {
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
+    }
+    return apiOk({
+      status: 'ready',
+      model_path: `/projects/${params.projectId}/models/${params.mId}/pretrained.pth`,
     })
   }),
 ]

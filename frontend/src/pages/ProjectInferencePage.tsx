@@ -17,6 +17,7 @@ import {
   Select,
   Space,
   Statistic,
+  Table,
   Tabs,
   Tag,
   Typography,
@@ -24,11 +25,15 @@ import {
 } from 'antd'
 import {
   evaluateModel,
+  getInferenceResult,
   listInferenceDatasets,
   listInferenceModels,
+  runBatchInference,
   runOnlineInference,
+  type BatchInferenceRequest,
   type Dataset,
   type EvaluateResult,
+  type InferenceTask,
   type Model,
   type OnlineInferenceResult,
 } from '@/api/inference'
@@ -52,6 +57,12 @@ interface EvaluationFormValues {
   metrics: string[]
 }
 
+interface BatchFormValues {
+  model_id: string
+  dataset_id: string
+  output_format: BatchInferenceRequest['output_format']
+}
+
 interface OnlineFormValues {
   model_id: string
   input_data: string
@@ -69,6 +80,35 @@ function stringifyValue(value: unknown) {
     return String(value)
   }
   return JSON.stringify(value)
+}
+
+function taskStatusColor(status?: InferenceTask['status']) {
+  if (status === 'success') {
+    return 'green'
+  }
+  if (status === 'failed') {
+    return 'red'
+  }
+  if (status === 'running') {
+    return 'blue'
+  }
+  return 'default'
+}
+
+function taskStatusText(status?: InferenceTask['status']) {
+  if (status === 'success') {
+    return '成功'
+  }
+  if (status === 'failed') {
+    return '失败'
+  }
+  if (status === 'running') {
+    return '运行中'
+  }
+  if (status === 'pending') {
+    return '等待中'
+  }
+  return '未启动'
 }
 
 function buildConfusionMatrixOption(result?: EvaluateResult) {
@@ -187,6 +227,7 @@ export default function ProjectInferencePage() {
   const { projectId } = useParams()
   const [messageApi, contextHolder] = message.useMessage()
   const [evaluationResult, setEvaluationResult] = useState<EvaluateResult>()
+  const [batchTaskId, setBatchTaskId] = useState<string>()
   const [onlineResult, setOnlineResult] = useState<OnlineInferenceResult>()
 
   const modelsQuery = useQuery({
@@ -235,6 +276,34 @@ export default function ProjectInferencePage() {
     },
   })
 
+  const batchMutation = useMutation({
+    mutationFn: (values: BatchFormValues) =>
+      runBatchInference(projectId!, {
+        model_id: values.model_id,
+        dataset_id: values.dataset_id,
+        output_format: values.output_format,
+      }),
+    onSuccess: (data) => {
+      if (data.task_id) {
+        setBatchTaskId(data.task_id)
+      }
+      messageApi.success('批量推理任务已启动')
+    },
+    onError: () => {
+      messageApi.error('批量推理启动失败')
+    },
+  })
+
+  const batchResultQuery = useQuery({
+    queryKey: ['p5-batch-inference-result', projectId, batchTaskId],
+    queryFn: () => getInferenceResult(projectId!, batchTaskId!),
+    enabled: !!projectId && !!batchTaskId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'pending' || status === 'running' ? 1200 : false
+    },
+  })
+
   const onlineMutation = useMutation({
     mutationFn: (values: OnlineFormValues) => {
       let inputData: Record<string, unknown> | string
@@ -267,6 +336,31 @@ export default function ProjectInferencePage() {
   })
 
   const loadingOptions = modelsQuery.isLoading || datasetsQuery.isLoading
+  const batchTask = batchResultQuery.data ?? batchMutation.data
+  const batchPredictionRows = (batchTask?.predictions ?? []).map((item, index) => ({
+    key: `${batchTask?.task_id ?? 'batch'}-${index}`,
+    ...item,
+  }))
+  const batchPredictionColumns = [
+    {
+      title: '输入',
+      dataIndex: 'input',
+      key: 'input',
+      render: (value: unknown) => <Text code>{stringifyValue(value)}</Text>,
+    },
+    {
+      title: '预测',
+      dataIndex: 'prediction',
+      key: 'prediction',
+      render: (value: unknown) => stringifyValue(value),
+    },
+    {
+      title: '置信度',
+      dataIndex: 'confidence',
+      key: 'confidence',
+      render: (value?: number) => formatPercent(value),
+    },
+  ]
 
   const evaluationPanel = (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -361,6 +455,78 @@ export default function ProjectInferencePage() {
     </Row>
   )
 
+  const batchPanel = (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} lg={9}>
+        <Card>
+          <Form<BatchFormValues>
+            layout="vertical"
+            initialValues={{ output_format: 'csv' }}
+            onFinish={(values) => batchMutation.mutate(values)}
+          >
+            <Form.Item name="model_id" label="模型" rules={[{ required: true, message: '请选择模型' }]}>
+              <Select loading={modelsQuery.isLoading} options={modelOptions} placeholder="选择模型" />
+            </Form.Item>
+            <Form.Item name="dataset_id" label="数据集" rules={[{ required: true, message: '请选择数据集' }]}>
+              <Select loading={datasetsQuery.isLoading} options={datasetOptions} placeholder="选择数据集" />
+            </Form.Item>
+            <Form.Item name="output_format" label="输出格式" rules={[{ required: true, message: '请选择输出格式' }]}>
+              <Select
+                options={[
+                  { label: 'CSV', value: 'csv' },
+                  { label: 'JSON', value: 'json' },
+                ]}
+              />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" block loading={batchMutation.isPending} disabled={loadingOptions}>
+              启动批量推理
+            </Button>
+          </Form>
+        </Card>
+      </Col>
+      <Col xs={24} lg={15}>
+        <Card
+          title="任务进度"
+          extra={
+            batchTask ? (
+              <Tag color={taskStatusColor(batchTask.status)}>
+                {taskStatusText(batchTask.status)}
+                {batchResultQuery.isFetching && batchTask.status === 'running' ? ' · 同步中' : ''}
+              </Tag>
+            ) : null
+          }
+        >
+          {batchTask ? (
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+              <Descriptions bordered size="small" column={1}>
+                <Descriptions.Item label="任务 ID">{batchTask.task_id ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="模型">{batchTask.model_id ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="数据集">{batchTask.dataset_id ?? '-'}</Descriptions.Item>
+                <Descriptions.Item label="结果路径">
+                  {batchTask.result_path ? <Text code>{batchTask.result_path}</Text> : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+              <Progress
+                percent={batchTask.progress ?? 0}
+                status={batchTask.status === 'failed' ? 'exception' : batchTask.status === 'success' ? 'success' : 'active'}
+              />
+              <Table
+                size="small"
+                rowKey="key"
+                columns={batchPredictionColumns}
+                dataSource={batchPredictionRows}
+                pagination={false}
+                locale={{ emptyText: batchTask.status === 'success' ? '暂无结果预览' : '任务完成后显示结果预览' }}
+              />
+            </Space>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无批量推理任务" />
+          )}
+        </Card>
+      </Col>
+    </Row>
+  )
+
   return (
     <div>
       {contextHolder}
@@ -372,6 +538,11 @@ export default function ProjectInferencePage() {
             key: 'evaluate',
             label: '模型评估',
             children: evaluationPanel,
+          },
+          {
+            key: 'batch',
+            label: '批量推理',
+            children: batchPanel,
           },
           {
             key: 'online',
