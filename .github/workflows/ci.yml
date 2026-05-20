@@ -139,9 +139,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Prepare backend Docker build context
-        run: cp requirements.txt backend/requirements.txt
-
       - name: Build backend image (no push)
         uses: docker/build-push-action@v6
         with:

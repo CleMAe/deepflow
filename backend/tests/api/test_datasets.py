@@ -125,7 +125,7 @@ class TestDatasetsCreate:
             headers=auth_headers,
         )
 
-        assert resp.status_code == 201
+        assert resp.status_code == 200
         body = resp.json()
         assert_api_envelope(body, code=0)
         data = body["data"]
