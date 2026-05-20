@@ -11,6 +11,9 @@ from src.infra.db.base import Base, TimestampUpdateMixin, UUIDPrimaryKeyMixin
 from src.infra.db.types import JSONType
 
 if TYPE_CHECKING:
+    from src.infra.db.models.agent_tool import AgentTool
+    from src.infra.db.models.conversation import Conversation
+    from src.infra.db.models.prompt_template import PromptTemplate
     from src.infra.db.models.project import Project
 
 
@@ -40,3 +43,12 @@ class Agent(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="agents")
+    agent_tools: Mapped[list["AgentTool"]] = relationship(
+        back_populates="agent", cascade="all, delete-orphan", lazy="selectin",
+    )
+    conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="agent", cascade="all, delete-orphan",
+    )
+    prompt_templates: Mapped[list["PromptTemplate"]] = relationship(
+        back_populates="agent", cascade="all, delete-orphan",
+    )

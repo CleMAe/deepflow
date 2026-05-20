@@ -10,6 +10,7 @@ from app.api.v1.models.router import library_router, router as models_router
 from app.api.v1.projects.router import router as projects_router
 from app.api.v1.training.router import router as training_router
 from app.api.v1.ws.router import router as ws_router
+from src.agent.router import router as agent_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -23,3 +24,4 @@ api_router.include_router(models_router)
 api_router.include_router(library_router)
 api_router.include_router(experiments_router)
 api_router.include_router(ws_router)
+api_router.include_router(agent_router)
