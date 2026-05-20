@@ -1,132 +1,187 @@
 import { http, HttpResponse } from 'msw'
+import type { components } from '@/api/types'
+import {
+  getProjectModels,
+  libraryModels,
+  projectModels,
+} from '../fixtures/models'
 
-const mockModels = [
-  {
-    id: 'model-1',
-    project_id: 'proj-1',
-    name: 'ResNet-18 商品分类',
-    arch_type: 'resnet18',
-    params_cfg: { num_classes: 3, image_size: 224 },
-    pretrained: true,
-    pretrained_source: 'huggingface',
-    model_path: '/projects/proj-1/models/model-1/checkpoint/best.pth',
-    description: '用于商品图片分类的默认模型',
-    created_at: '2026-05-18T12:00:00Z',
-    updated_at: '2026-05-18T12:00:00Z',
-  },
-  {
-    id: 'model-2',
-    project_id: 'proj-1',
-    name: 'MLP 销售预测',
-    arch_type: 'mlp',
-    params_cfg: { hidden_dims: [128, 64], output_dim: 1 },
-    pretrained: false,
-    model_path: '/projects/proj-1/models/model-2/checkpoint/latest.pth',
-    description: '用于结构化业务数据回归预测',
-    created_at: '2026-05-18T12:30:00Z',
-    updated_at: '2026-05-18T12:30:00Z',
-  },
-]
+type ModelCreate = components['schemas']['ModelCreate']
+type ModelUpdate = components['schemas']['ModelUpdate']
+type ModelValidateRequest = components['schemas']['ModelValidateRequest']
 
-export const modelHandlers = [
-  http.get('/api/v1/projects/:projectId/models', ({ params }) => {
-    const items = mockModels.filter((m) => m.project_id === params.projectId)
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: { page: 1, page_size: 20, total: items.length, items },
-      request_id: 'mock-models-list',
+function apiOk<T>(data: T, requestId = 'mock-p4-models') {
+  return HttpResponse.json({
+    code: 0,
+    message: 'success',
+    data,
+    request_id: requestId,
+  })
+}
+
+function filterLibrary(taskType: string | null, search: string | null) {
+  let items = [...libraryModels]
+  if (taskType) {
+    items = items.filter((m) => m.task_type === taskType)
+  }
+  if (search) {
+    const q = search.toLowerCase()
+    items = items.filter(
+      (m) =>
+        m.name?.toLowerCase().includes(q) ||
+        m.arch_type?.toLowerCase().includes(q) ||
+        m.description?.toLowerCase().includes(q)
+    )
+  }
+  return items
+}
+
+export const modelsHandlers = [
+  http.get('/api/v1/models/library', ({ request }) => {
+    const url = new URL(request.url)
+    const taskType = url.searchParams.get('task_type')
+    const search = url.searchParams.get('search')
+    return apiOk(filterLibrary(taskType, search))
+  }),
+
+  http.get('/api/v1/models/library/:modelId', ({ params }) => {
+    const model = libraryModels.find((m) => m.model_id === params.modelId)
+    if (!model) {
+      return HttpResponse.json(
+        { code: 40002001, message: 'Model not found in library', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
+    }
+    return apiOk(model)
+  }),
+
+  http.get('/api/v1/projects/:projectId/models', ({ params, request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || 1)
+    const pageSize = Number(url.searchParams.get('page_size') || 20)
+    const items = getProjectModels(String(params.projectId))
+
+    return apiOk({
+      page,
+      page_size: pageSize,
+      total: items.length,
+      items,
     })
   }),
 
-  http.post('/api/v1/projects/:projectId/models', async ({ request, params }) => {
-    const body = (await request.json()) as {
-      name: string
-      arch_type: string
-      params_cfg?: Record<string, unknown>
-      description?: string
+  http.post('/api/v1/projects/:projectId/models', async ({ params, request }) => {
+    const payload = (await request.json()) as ModelCreate
+    const now = new Date().toISOString()
+    const library = libraryModels.find((m) => m.arch_type === payload.arch_type)
+    const created = {
+      id: `model-${Date.now()}`,
+      project_id: String(params.projectId),
+      name: payload.name,
+      arch_type: payload.arch_type,
+      params_cfg: payload.params_cfg ?? library?.default_hyperparams ?? {},
+      pretrained: library?.pretrained_available ?? false,
+      description: payload.description ?? library?.description,
+      created_at: now,
+      updated_at: now,
     }
-    const newModel = {
-      id: `model-${Math.random().toString(36).slice(2)}`,
-      project_id: params.projectId,
-      name: body.name,
-      arch_type: body.arch_type,
-      params_cfg: body.params_cfg ?? {},
-      pretrained: false,
-      model_path: '',
-      description: body.description ?? '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    mockModels.push(newModel)
+    projectModels.push(created)
     return HttpResponse.json(
-      { code: 0, message: 'success', data: newModel, request_id: 'mock-models-create' },
+      {
+        code: 0,
+        message: 'success',
+        data: created,
+        request_id: 'mock-p4-create',
+      },
       { status: 201 }
     )
   }),
 
   http.get('/api/v1/projects/:projectId/models/:mId', ({ params }) => {
-    const model = mockModels.find((m) => m.id === params.mId)
+    const model = projectModels.find(
+      (m) => m.id === params.mId && m.project_id === params.projectId
+    )
     if (!model) {
-      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
     }
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: model,
-      request_id: 'mock-models-get',
-    })
+    return apiOk(model)
   }),
 
   http.put('/api/v1/projects/:projectId/models/:mId', async ({ params, request }) => {
-    const model = mockModels.find((m) => m.id === params.mId)
-    if (!model) {
-      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
+    const payload = (await request.json()) as ModelUpdate
+    const index = projectModels.findIndex(
+      (m) => m.id === params.mId && m.project_id === params.projectId
+    )
+    if (index < 0) {
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
     }
-    const body = (await request.json()) as { name?: string; params_cfg?: Record<string, unknown>; description?: string }
-    Object.assign(model, body, { updated_at: new Date().toISOString() })
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: model,
-      request_id: 'mock-models-update',
-    })
+    const current = projectModels[index]
+    const updated = {
+      ...current,
+      ...payload,
+      params_cfg: payload.params_cfg ?? current.params_cfg,
+      updated_at: new Date().toISOString(),
+    }
+    projectModels[index] = updated
+    return apiOk(updated)
   }),
 
   http.delete('/api/v1/projects/:projectId/models/:mId', ({ params }) => {
-    const idx = mockModels.findIndex((m) => m.id === params.mId)
+    const idx = projectModels.findIndex((m) => m.id === params.mId && m.project_id === params.projectId)
     if (idx === -1) {
-      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
     }
-    mockModels.splice(idx, 1)
-    return HttpResponse.json({ code: 0, message: 'deleted', data: null, request_id: 'mock-models-delete' })
+    projectModels.splice(idx, 1)
+    return HttpResponse.json(
+      { code: 0, message: 'deleted', data: null, request_id: 'mock-p4-delete' }
+    )
   }),
 
   http.post('/api/v1/projects/:projectId/models/:mId/validate', async ({ request }) => {
-    const body = (await request.json()) as { params_cfg?: Record<string, unknown> }
-    const cfg = body.params_cfg ?? {}
+    const payload = (await request.json()) as ModelValidateRequest
+    const cfg = payload.params_cfg ?? {}
     const errors: { field: string; message: string }[] = []
-    if (cfg.num_classes !== undefined && typeof cfg.num_classes !== 'number') {
-      errors.push({ field: 'num_classes', message: 'must be a number' })
+    const warnings: { field: string; message: string }[] = []
+
+    if (cfg.num_classes !== undefined && Number(cfg.num_classes) < 2) {
+      errors.push({ field: 'num_classes', message: '分类任务至少需要 2 个类别' })
     }
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: { valid: errors.length === 0, errors, warnings: [] },
-      request_id: 'mock-models-validate',
+    if (cfg.learning_rate !== undefined && Number(cfg.learning_rate) <= 0) {
+      errors.push({ field: 'learning_rate', message: '学习率必须大于 0' })
+    }
+    if (cfg.batch_size !== undefined && Number(cfg.batch_size) < 1) {
+      errors.push({ field: 'batch_size', message: 'Batch Size 至少为 1' })
+    }
+    if (cfg.epochs !== undefined && Number(cfg.epochs) > 200) {
+      warnings.push({ field: 'epochs', message: '训练轮数较大，可能耗时较长' })
+    }
+
+    return apiOk({
+      valid: errors.length === 0,
+      errors,
+      warnings,
     })
   }),
 
   http.post('/api/v1/projects/:projectId/models/:mId/pretrained', async ({ params }) => {
-    const model = mockModels.find((m) => m.id === params.mId)
+    const model = projectModels.find((m) => m.id === params.mId && m.project_id === params.projectId)
     if (!model) {
-      return HttpResponse.json({ code: 40020001, message: 'model not found' }, { status: 404 })
+      return HttpResponse.json(
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { status: 404 }
+      )
     }
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data: { status: 'ready', model_path: `/projects/${params.projectId}/models/${params.mId}/pretrained.pth` },
-      request_id: 'mock-models-pretrained',
+    return apiOk({
+      status: 'ready',
+      model_path: `/projects/${params.projectId}/models/${params.mId}/pretrained.pth`,
     })
   }),
 ]
