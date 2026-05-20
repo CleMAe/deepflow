@@ -48,7 +48,7 @@ export const modelsHandlers = [
     const model = libraryModels.find((m) => m.model_id === params.modelId)
     if (!model) {
       return HttpResponse.json(
-        { code: 40400101, message: 'Model not found in library', data: null, request_id: 'mock-p4-404' },
+        { code: 40002001, message: 'Model not found in library', data: null, request_id: 'mock-p4-404' },
         { status: 404 }
       )
     }
@@ -102,7 +102,7 @@ export const modelsHandlers = [
     )
     if (!model) {
       return HttpResponse.json(
-        { code: 40400201, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
         { status: 404 }
       )
     }
@@ -116,7 +116,7 @@ export const modelsHandlers = [
     )
     if (index < 0) {
       return HttpResponse.json(
-        { code: 40400201, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
+        { code: 40002002, message: 'Project model not found', data: null, request_id: 'mock-p4-404' },
         { status: 404 }
       )
     }

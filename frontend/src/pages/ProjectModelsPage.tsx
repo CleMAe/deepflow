@@ -38,6 +38,7 @@ import {
   validateModelConfig,
   type LibraryModel,
   type Model,
+  type ValidationResult,
 } from '@/api/models'
 
 const { Text, Paragraph } = Typography
@@ -150,11 +151,7 @@ export default function ProjectModelsPage() {
   const [detailModel, setDetailModel] = useState<LibraryModel | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [editingModel, setEditingModel] = useState<Model | null>(null)
-  const [validation, setValidation] = useState<{
-    valid?: boolean
-    errors?: { field?: string; message?: string }[]
-    warnings?: { field?: string; message?: string }[]
-  } | null>(null)
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
 
   const libraryQuery = useQuery({
     queryKey: ['model-library', taskFilter, search],
@@ -163,7 +160,6 @@ export default function ProjectModelsPage() {
         task_type: taskFilter || undefined,
         search: search.trim() || undefined,
       }),
-    enabled: !!projectId,
   })
 
   const projectModelsQuery = useQuery({
