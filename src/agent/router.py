@@ -1,14 +1,14 @@
-"""Agent API routes — 11 endpoints (CRUD + tool binding + chat + prompts)."""
+"""Agent API routes — 12 endpoints (CRUD + tool binding + chat + prompts)."""
 
 from __future__ import annotations
 
 import json
-import uuid
-from typing import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from uuid import UUID
 
+from app.api.deps import require_project_access
 from app.core.response import success
 from app.db.session import get_db
 from src.agent.chat_engine import ChatEngine
@@ -30,7 +30,6 @@ from src.agent.schemas import (
 )
 from src.agent.service import AgentService
 from src.agent.tool_wrapper import ToolWrapper
-from src.infra.db.models.agent import AgentStatus
 
 router = APIRouter(prefix="/projects/{project_id}/agents", tags=["Agent"])
 
@@ -50,13 +49,16 @@ def _agent_to_out(a: object) -> AgentOut:
     )
 
 
-def _get_deps(db: Session = Depends(get_db)):
+def _get_deps(
+    db: Session = Depends(get_db),
+    _pid: UUID = Depends(require_project_access),
+):
     repo = AgentRepository(db)
     service = AgentService(repo)
     tool_wrapper = ToolWrapper(repo)
     chat_engine = ChatEngine(repo, tool_wrapper)
     prompt_manager = PromptManager(repo)
-    return repo, service, chat_engine, prompt_manager
+    return repo, service, chat_engine, prompt_manager, db
 
 
 # ── CRUD ────────────────────────────────────────────────────────
@@ -70,7 +72,7 @@ async def list_agents(
     status: str | None = None,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, _ = deps
     rows, total = service.list_agents(project_id, page=page, page_size=page_size, status=status)
     items = [_agent_to_out(a) for a in rows]
     return success(AgentListOut(page=page, page_size=page_size, total=total, items=items).model_dump(mode="json"))
@@ -82,8 +84,9 @@ async def create_agent(
     body: AgentCreate,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, db = deps
     agent = service.create_agent(project_id, body)
+    db.commit()
     return success(_agent_to_out(agent).model_dump(mode="json"))
 
 
@@ -93,7 +96,7 @@ async def get_agent(
     agent_id: UUID,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, _ = deps
     agent = service.get_agent(project_id, agent_id)
     return success(_agent_to_out(agent).model_dump(mode="json"))
 
@@ -105,8 +108,9 @@ async def update_agent(
     body: AgentUpdate,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, db = deps
     agent = service.update_agent(project_id, agent_id, body)
+    db.commit()
     return success(_agent_to_out(agent).model_dump(mode="json"))
 
 
@@ -116,8 +120,9 @@ async def delete_agent(
     agent_id: UUID,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, db = deps
     service.delete_agent(project_id, agent_id)
+    db.commit()
     return success(None)
 
 
@@ -131,8 +136,9 @@ async def bind_tools(
     body: ToolBindRequest,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, db = deps
     result = service.bind_tools(project_id, agent_id, body.tools)
+    db.commit()
     return success(result)
 
 
@@ -142,7 +148,7 @@ async def list_tools(
     agent_id: UUID,
     deps: tuple = Depends(_get_deps),
 ):
-    _, service, _, _ = deps
+    _, service, _, _, _ = deps
     return success(service.list_tools(project_id, agent_id))
 
 
@@ -158,11 +164,12 @@ async def agent_chat(
 ):
     from sse_starlette.sse import EventSourceResponse
 
-    repo, service, chat_engine, _ = deps
+    repo, service, chat_engine, _, db = deps
     agent = service.get_agent(project_id, agent_id)
     conv, conv_id = service.ensure_conversation(
         project_id, agent_id, body.conversation_id, body.message
     )
+    db.commit()
 
     async def event_generator():
         async for event in chat_engine.chat(
@@ -190,7 +197,7 @@ async def chat_history(
     page_size: int = Query(50, ge=1, le=200),
     deps: tuple = Depends(_get_deps),
 ):
-    repo, service, _, _ = deps
+    repo, service, _, _, _ = deps
     service.get_agent(project_id, agent_id)  # verify agent exists
     conv = repo.get_conversation(conversation_id)
     if not conv or conv.agent_id != agent_id:
@@ -225,10 +232,10 @@ async def create_prompt(
     body: PromptCreate,
     deps: tuple = Depends(_get_deps),
 ):
-    _, _, _, prompt_manager = deps
-    service = deps[1]
+    _, service, _, prompt_manager, db = deps
     service.get_agent(project_id, agent_id)  # verify agent exists
     result = prompt_manager.create_prompt(agent_id, body)
+    db.commit()
     return success(result)
 
 
@@ -238,7 +245,20 @@ async def list_prompts(
     agent_id: UUID,
     deps: tuple = Depends(_get_deps),
 ):
-    _, _, _, prompt_manager = deps
-    service = deps[1]
+    _, service, _, prompt_manager, _ = deps
     service.get_agent(project_id, agent_id)  # verify agent exists
     return success(prompt_manager.list_prompts(agent_id))
+
+
+@router.post("/{agent_id}/prompts/{prompt_id}/render")
+async def render_prompt(
+    project_id: UUID,
+    agent_id: UUID,
+    prompt_id: UUID,
+    body: PromptRenderRequest,
+    deps: tuple = Depends(_get_deps),
+):
+    _, service, _, prompt_manager, _ = deps
+    service.get_agent(project_id, agent_id)  # verify agent exists
+    rendered = prompt_manager.render_prompt(agent_id, prompt_id, body.variables)
+    return success({"rendered": rendered})

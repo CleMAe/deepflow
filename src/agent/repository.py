@@ -166,6 +166,9 @@ class AgentRepository:
     def get_prompt(self, prompt_id: uuid.UUID) -> PromptTemplate | None:
         return self._db.get(PromptTemplate, prompt_id)
 
+    def commit(self) -> None:
+        self._db.commit()
+
 
 def _extract_variables(template: str) -> list[str]:
     return sorted(set(re.findall(r"\$(\w+)", template)))

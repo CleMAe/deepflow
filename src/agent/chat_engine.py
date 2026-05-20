@@ -34,6 +34,7 @@ class ChatEngine:
             role=ChatRole.USER,
             content=user_message,
         )
+        self._repo.commit()
 
         # Build message history
         history = self._repo.get_messages(
@@ -123,6 +124,7 @@ class ChatEngine:
                             content=assistant_content,
                             tool_calls=tool_calls_log if tool_calls_log else None,
                         )
+                        self._repo.commit()
                         return
 
                 else:
@@ -144,3 +146,4 @@ class ChatEngine:
                 content=assistant_content or "(tool call only)",
                 tool_calls=tool_calls_log if tool_calls_log else None,
             )
+            self._repo.commit()
