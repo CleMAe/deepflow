@@ -1,5 +1,7 @@
 import type { components } from '@/api/types'
 
+import { DEMO_PROJECT_ID, MOCK_ALT_PROJECT_ID } from '@/mocks/demoIds'
+
 export type LibraryModel = components['schemas']['LibraryModel']
 export type Model = components['schemas']['Model']
 
@@ -129,7 +131,7 @@ export const libraryModels: LibraryModel[] = [
 export const projectModels: Model[] = [
   {
     id: 'model-1',
-    project_id: 'proj-1',
+    project_id: MOCK_ALT_PROJECT_ID,
     name: 'ResNet-18 商品分类',
     arch_type: 'resnet18',
     params_cfg: {
@@ -145,14 +147,14 @@ export const projectModels: Model[] = [
     },
     pretrained: true,
     pretrained_source: 'torchvision',
-    model_path: '/projects/proj-1/models/model-1/checkpoint/best.pth',
+    model_path: `/projects/${MOCK_ALT_PROJECT_ID}/models/model-1/checkpoint/best.pth`,
     description: '用于商品图片分类的默认模型',
     created_at: '2026-05-18T12:00:00Z',
     updated_at: '2026-05-18T12:00:00Z',
   },
   {
     id: 'model-2',
-    project_id: 'proj-1',
+    project_id: DEMO_PROJECT_ID,
     name: 'MLP 销售预测',
     arch_type: 'mlp',
     params_cfg: {
@@ -167,7 +169,7 @@ export const projectModels: Model[] = [
       device: 'cpu',
     },
     pretrained: false,
-    model_path: '/projects/proj-1/models/model-2/checkpoint/latest.pth',
+    model_path: `/projects/${DEMO_PROJECT_ID}/models/model-2/checkpoint/latest.pth`,
     description: '用于结构化业务数据回归预测',
     created_at: '2026-05-18T12:30:00Z',
     updated_at: '2026-05-18T12:30:00Z',

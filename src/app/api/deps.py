@@ -99,6 +99,8 @@ async def get_current_user_id(
     try:
         payload = decode_token(credentials.credentials)
     except Exception:
+        if settings.dev_allow_anonymous:
+            return UUID("00000000-0000-0000-0000-000000000001")
         raise AppError.unauthorized("Invalid or expired token")
 
     if payload.get("type") != "access":

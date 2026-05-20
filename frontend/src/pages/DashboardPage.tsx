@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Card, Row, Col, List, Button } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import api from '@/lib/axios'
+import api, { type ApiResponse } from '@/lib/axios'
 import { useProjectStore } from '@/stores/projectStore'
 import type { components } from '@/api/types'
 
@@ -17,7 +17,7 @@ export default function DashboardPage() {
     queryKey: ['projects'],
     queryFn: async () => {
       const res = await api.get('/projects')
-      return (res as unknown as PaginatedProjects)
+      return (res as unknown as ApiResponse<PaginatedProjects>).data as PaginatedProjects
     },
   })
 

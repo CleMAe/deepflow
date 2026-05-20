@@ -1,6 +1,8 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/api/types'
 
+import { MOCK_ALT_PROJECT_ID } from '@/mocks/demoIds'
+
 type Agent = components['schemas']['Agent']
 type AgentCreate = components['schemas']['AgentCreate']
 type AgentTool = components['schemas']['AgentTool']
@@ -12,7 +14,7 @@ const now = '2026-05-19T09:00:00Z'
 const mockAgents: Agent[] = [
   {
     id: 'agent-1',
-    project_id: 'proj-1',
+    project_id: MOCK_ALT_PROJECT_ID,
     name: '商品质检助手',
     description: '基于图像分类模型解释批量推理结果',
     system_prompt: '你是一个严谨的商品质检分析助手，会结合模型输出给出可追溯结论。',
