@@ -3,12 +3,6 @@ import type { components } from '@/api/types'
 
 type ApiResponse<T> = Omit<components['schemas']['ApiResponse'], 'data'> & { data: T }
 
-function isApiEnvelope(
-  body: unknown
-): body is { code: number; message?: string; data: unknown; request_id?: string } {
-  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body
-}
-
 const api = axios.create({
   baseURL: '/api/v1',
   timeout: 30000,
@@ -26,16 +20,7 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => {
-    const body = response.data
-    if (isApiEnvelope(body)) {
-      if (body.code !== 0) {
-        return Promise.reject(new Error(body.message || '请求失败'))
-      }
-      return body.data
-    }
-    return body
-  },
+  (response) => response.data,
   async (error) => {
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {

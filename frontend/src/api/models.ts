@@ -1,4 +1,4 @@
-import api from '@/lib/axios'
+import api, { type ApiResponse } from '@/lib/axios'
 import type { components } from '@/api/types'
 
 export type LibraryModel = components['schemas']['LibraryModel']
@@ -15,35 +15,35 @@ export type ModelLibraryQuery = {
 }
 
 export async function listModelLibrary(params?: ModelLibraryQuery) {
-  const res = await api.get('/models/library', { params })
-  return res as unknown as LibraryModel[]
+  const res = (await api.get('/models/library', { params })) as ApiResponse<LibraryModel[]>
+  return res.data
 }
 
 export async function getModelLibraryDetail(modelId: string) {
-  const res = await api.get(`/models/library/${modelId}`)
-  return res as unknown as LibraryModel
+  const res = (await api.get(`/models/library/${modelId}`)) as ApiResponse<LibraryModel>
+  return res.data
 }
 
 export async function listProjectModels(projectId: string, page = 1, pageSize = 20) {
-  const res = await api.get(`/projects/${projectId}/models`, {
+  const res = (await api.get(`/projects/${projectId}/models`, {
     params: { page, page_size: pageSize },
-  })
-  return res as unknown as PaginatedModels
+  })) as ApiResponse<PaginatedModels>
+  return res.data
 }
 
 export async function createProjectModel(projectId: string, payload: ModelCreate) {
-  const res = await api.post(`/projects/${projectId}/models`, payload)
-  return res as unknown as Model
+  const res = (await api.post(`/projects/${projectId}/models`, payload)) as ApiResponse<Model>
+  return res.data
 }
 
 export async function getProjectModel(projectId: string, modelId: string) {
-  const res = await api.get(`/projects/${projectId}/models/${modelId}`)
-  return res as unknown as Model
+  const res = (await api.get(`/projects/${projectId}/models/${modelId}`)) as ApiResponse<Model>
+  return res.data
 }
 
 export async function updateProjectModel(projectId: string, modelId: string, payload: ModelUpdate) {
-  const res = await api.put(`/projects/${projectId}/models/${modelId}`, payload)
-  return res as unknown as Model
+  const res = (await api.put(`/projects/${projectId}/models/${modelId}`, payload)) as ApiResponse<Model>
+  return res.data
 }
 
 export async function validateModelConfig(
@@ -51,6 +51,9 @@ export async function validateModelConfig(
   modelId: string,
   payload: ModelValidateRequest
 ) {
-  const res = await api.post(`/projects/${projectId}/models/${modelId}/validate`, payload)
-  return res as unknown as ValidationResult
+  const res = (await api.post(
+    `/projects/${projectId}/models/${modelId}/validate`,
+    payload
+  )) as ApiResponse<ValidationResult>
+  return res.data
 }
