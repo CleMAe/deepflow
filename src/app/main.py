@@ -13,6 +13,7 @@ from app.db.session import get_db, init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import src.infra.db.models  # noqa: F401 — register all models with Base.metadata
     init_db()
     db = next(get_db())
     try:
@@ -24,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
-    description="P7 Data API — OpenAPI-aligned, Protocol DI, DDL-backed store",
+    version="0.3.0",
+    description="DeepFlow API — Training engine, Model library, Inference, Experiments",
     lifespan=lifespan,
 )
 
@@ -49,6 +50,11 @@ async def health():
             "dev_allow_anonymous": settings.dev_allow_anonymous,
         }
     )
+
+
+@app.get("/api/v1/health")
+async def health_v1():
+    return success({"status": "ok"})
 
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)

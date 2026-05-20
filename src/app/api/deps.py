@@ -8,8 +8,8 @@ from uuid import UUID
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from shared.protocols import StorageProtocol
 from sqlalchemy.orm import Session
+from shared.protocols import StorageProtocol
 
 from app.core.config import settings
 from app.core.errors import AppError
@@ -18,6 +18,7 @@ from app.repositories.dataset_repository import DatasetRepository
 from app.services.cleaning_mock import MockCleaningService
 from app.services.dataset_service import DatasetService
 from app.services.storage_mock import MockFileStorage
+from app.services.training_service import TrainingService
 from app.services.upload_service import UploadService
 
 _bearer = HTTPBearer(auto_error=False)
@@ -25,7 +26,6 @@ _bearer = HTTPBearer(auto_error=False)
 
 @lru_cache
 def get_storage() -> StorageProtocol:
-    """Replace with P6 `RealFileStorage` at Day3 integration."""
     return MockFileStorage()
 
 
@@ -55,15 +55,19 @@ def get_cleaning_service(
     return MockCleaningService(repo, storage, datasets)
 
 
+def get_training_service(
+    storage: StorageProtocol = Depends(get_storage),
+) -> TrainingService:
+    return TrainingService(storage)
+
+
 async def get_current_user_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UUID:
-    """P6 `AuthProtocol` placeholder — rejects missing token when anonymous dev mode is off."""
     if settings.dev_allow_anonymous:
         return UUID("00000000-0000-0000-0000-000000000001")
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AppError.unauthorized("Missing or invalid Authorization header")
-    # Day3: decode JWT via P6
     return UUID("00000000-0000-0000-0000-000000000001")
 
 
@@ -71,6 +75,5 @@ async def require_project_access(
     project_id: UUID,
     user_id: Annotated[UUID, Depends(get_current_user_id)],
 ) -> UUID:
-    """P6 RBAC placeholder — Day3 check project membership."""
     _ = user_id
     return project_id
