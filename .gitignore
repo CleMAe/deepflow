@@ -41,3 +41,8 @@ postgres_data/
 
 # Uploads temp
 uploads/
+
+# Claude local context files (do not commit)
+.claude-role.md
+.claude-project.md
+.claude/
