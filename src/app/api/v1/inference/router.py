@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_project_access, get_db, get_inference_service
+from app.api.deps import get_db, get_inference_service, require_project_access
 from app.core.response import success
 from app.schemas.inference import (
     InferenceBatchRequest,

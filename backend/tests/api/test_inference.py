@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from src.infra.db.models.ml_model import MLModel
 from src.infra.db.models.user import User
 from tests.factories.project import ProjectFactory
-from tests.factories.user import UserFactory
 
 
 @pytest.fixture

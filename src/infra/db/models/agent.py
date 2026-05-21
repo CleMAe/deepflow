@@ -13,8 +13,8 @@ from src.infra.db.types import JSONType
 if TYPE_CHECKING:
     from src.infra.db.models.agent_tool import AgentTool
     from src.infra.db.models.conversation import Conversation
-    from src.infra.db.models.prompt_template import PromptTemplate
     from src.infra.db.models.project import Project
+    from src.infra.db.models.prompt_template import PromptTemplate
 
 
 class AgentStatus(str, enum.Enum):

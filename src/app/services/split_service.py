@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM, ERR_DATASET_NOT_FOUND
+from app.core.errors import ERR_DATASET_INVALID_PARAM, ERR_DATASET_NOT_FOUND, AppError
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.eda import SplitRequest, SplitResultSchema
 from app.services.data_parser import PandasDataParser, columns_meta_to_db

@@ -13,15 +13,11 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
 
 from src.engine.manager import _STATUS_DIR, TrainingEngineManager
 from src.infra.db.models.training_job import TrainingJob
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from app.api.deps import get_db, get_current_user_id
-from app.core.errors import AppError
 
 router = APIRouter(tags=["Training"])
 
