@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import {
@@ -43,6 +43,7 @@ import {
 import { listInferenceModels, type Model } from '@/api/inference'
 
 const { Paragraph, Text } = Typography
+const MAX_TOOL_EVENTS = 40
 
 type AgentModelConfig = NonNullable<AgentCreate['model_config']>
 type AgentProvider = AgentModelConfig['provider']
@@ -111,6 +112,12 @@ function getAgentModelName(agent?: Agent) {
 
 function getEventText(event: AgentStreamEvent) {
   return event.content ?? event.text ?? ''
+}
+
+function appendLatestAssistantMessage(messages: LocalChatMessage[], text: string) {
+  return messages.map((item, index) =>
+    index === messages.length - 1 && item.role === 'assistant' ? { ...item, content: `${item.content}${text}` } : item
+  )
 }
 
 function renderToolTags(tools?: AgentTool[]) {
@@ -204,9 +211,29 @@ export default function ProjectAgentsPage() {
   const [toolEvents, setToolEvents] = useState<ToolTimelineItem[]>([])
   const [streaming, setStreaming] = useState(false)
   const streamAbortRef = useRef<AbortController>()
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const tokenBufferRef = useRef('')
+  const flushTimerRef = useRef<number>()
   const [createForm] = Form.useForm<CreateAgentFormValues>()
   const [bindForm] = Form.useForm<BindToolFormValues>()
   const [promptForm] = Form.useForm<PromptFormValues>()
+
+  useEffect(() => {
+    const container = chatScrollRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [chatMessages])
+
+  useEffect(
+    () => () => {
+      streamAbortRef.current?.abort()
+      if (flushTimerRef.current) {
+        window.clearTimeout(flushTimerRef.current)
+      }
+    },
+    []
+  )
 
   const agentsQuery = useQuery({
     queryKey: ['p5-agents', projectId],
@@ -349,81 +376,105 @@ export default function ProjectAgentsPage() {
     },
   })
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     createForm.resetFields()
     setCreateOpen(true)
-  }
+  }, [createForm])
 
-  const openBindModal = (agent: Agent) => {
+  const openBindModal = useCallback(
+    (agent: Agent) => {
     setSelectedToolAgent(agent)
     bindForm.setFieldsValue({
       name: 'model_predict',
       description: '调用已训练模型执行推理',
     })
     setBindOpen(true)
-  }
+    },
+    [bindForm]
+  )
 
-  const appendAssistantText = (text: string) => {
-    setChatMessages((items) =>
-      items.map((item, index) =>
-        index === items.length - 1 && item.role === 'assistant'
-          ? { ...item, content: `${item.content}${text}` }
-          : item
-      )
-    )
-  }
+  const flushAssistantBuffer = useCallback(() => {
+    if (!tokenBufferRef.current) {
+      return
+    }
+    const text = tokenBufferRef.current
+    tokenBufferRef.current = ''
+    if (flushTimerRef.current) {
+      window.clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = undefined
+    }
+    setChatMessages((items) => appendLatestAssistantMessage(items, text))
+  }, [])
 
-  const handleStreamEvent = (event: AgentStreamEvent) => {
+  const appendAssistantText = useCallback(
+    (text: string) => {
+      if (!text) {
+        return
+      }
+      tokenBufferRef.current += text
+      if (!flushTimerRef.current) {
+        flushTimerRef.current = window.setTimeout(flushAssistantBuffer, 48)
+      }
+    },
+    [flushAssistantBuffer]
+  )
+
+  const pushToolEvent = useCallback((item: Omit<ToolTimelineItem, 'id'>) => {
+    setToolEvents((items) => [
+      ...items.slice(-(MAX_TOOL_EVENTS - 1)),
+      {
+        ...item,
+        id: `${item.type}-${Date.now()}-${items.length}`,
+      },
+    ])
+  }, [])
+
+  const handleStreamEvent = useCallback(
+    (event: AgentStreamEvent) => {
     if (event.type === 'token' || event.type === 'content') {
       appendAssistantText(getEventText(event))
       return
     }
 
     if (event.type === 'tool_call') {
-      setToolEvents((items) => [
-        ...items,
-        {
-          id: `tool-call-${items.length}-${Date.now()}`,
+      flushAssistantBuffer()
+      pushToolEvent({
           type: 'tool_call',
           name: event.name ?? event.tool,
           detail: event.args,
-        },
-      ])
+      })
       return
     }
 
     if (event.type === 'tool_result') {
-      setToolEvents((items) => [
-        ...items,
-        {
-          id: `tool-result-${items.length}-${Date.now()}`,
+      flushAssistantBuffer()
+      pushToolEvent({
           type: 'tool_result',
           name: event.name ?? event.tool,
           detail: event.result,
-        },
-      ])
+      })
       return
     }
 
     if (event.type === 'error') {
-      setToolEvents((items) => [
-        ...items,
-        {
-          id: `tool-error-${items.length}-${Date.now()}`,
+      flushAssistantBuffer()
+      pushToolEvent({
           type: 'error',
           name: 'agent',
           detail: getEventText(event) || event.result,
-        },
-      ])
+      })
     }
-  }
+    },
+    [appendAssistantText, flushAssistantBuffer, pushToolEvent]
+  )
 
-  const sendChatMessage = async () => {
+  const sendChatMessage = useCallback(async () => {
     if (!projectId || !selectedAgent?.id || !chatInput.trim()) {
       messageApi.warning('请选择 Agent 并输入消息')
       return
     }
 
+    flushAssistantBuffer()
     const content = chatInput.trim()
     const assistantId = `assistant-${Date.now()}`
     const controller = new AbortController()
@@ -451,25 +502,35 @@ export default function ProjectAgentsPage() {
           },
         }
       )
+      flushAssistantBuffer()
       messageApi.success('Agent 回复完成')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
+        flushAssistantBuffer()
         messageApi.info('已停止生成')
       } else {
-        appendAssistantText('\n[对话请求失败，请稍后重试]')
+        flushAssistantBuffer()
+        setChatMessages((items) => appendLatestAssistantMessage(items, '\n[对话请求失败，请稍后重试]'))
         messageApi.error('Agent 对话失败')
       }
     } finally {
       setStreaming(false)
       streamAbortRef.current = undefined
     }
-  }
+  }, [chatInput, flushAssistantBuffer, handleStreamEvent, messageApi, projectId, selectedAgent])
 
-  const stopStreaming = () => {
+  const stopStreaming = useCallback(() => {
     streamAbortRef.current?.abort()
-  }
+  }, [])
 
-  const columns = [
+  const clearChat = useCallback(() => {
+    flushAssistantBuffer()
+    setChatMessages([])
+    setToolEvents([])
+  }, [flushAssistantBuffer])
+
+  const columns = useMemo(
+    () => [
     {
       title: 'Agent',
       key: 'agent',
@@ -529,9 +590,12 @@ export default function ProjectAgentsPage() {
         </Space>
       ),
     },
-  ]
+    ],
+    [deleteMutation, openBindModal]
+  )
 
-  const managementPanel = (
+  const managementPanel = useMemo(
+    () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={17}>
         <Card title="Agent 列表">
@@ -555,9 +619,12 @@ export default function ProjectAgentsPage() {
         </Card>
       </Col>
     </Row>
+    ),
+    [agents, agentsQuery.isLoading, boundToolCount, columns, selectedAgent]
   )
 
-  const chatPanel = (
+  const chatPanel = useMemo(
+    () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={7}>
         <Card title="对话配置">
@@ -595,7 +662,16 @@ export default function ProjectAgentsPage() {
           }
         >
           <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <div style={{ minHeight: 360, maxHeight: 520, overflow: 'auto', paddingRight: 8 }}>
+            <div
+              ref={chatScrollRef}
+              style={{
+                minHeight: 360,
+                maxHeight: 520,
+                overflow: 'auto',
+                padding: '4px 8px 4px 0',
+                scrollBehavior: 'smooth',
+              }}
+            >
               <ChatMessages messages={chatMessages} />
             </div>
             <Input.TextArea
@@ -606,7 +682,7 @@ export default function ProjectAgentsPage() {
               disabled={streaming}
             />
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Button onClick={() => setChatMessages([])} disabled={streaming || chatMessages.length === 0}>
+              <Button onClick={clearChat} disabled={streaming || (chatMessages.length === 0 && toolEvents.length === 0)}>
                 清空对话
               </Button>
               <Space>
@@ -628,9 +704,23 @@ export default function ProjectAgentsPage() {
         </Card>
       </Col>
     </Row>
+    ),
+    [
+      agentOptions,
+      agentsQuery.isLoading,
+      chatInput,
+      chatMessages,
+      clearChat,
+      selectedAgent,
+      sendChatMessage,
+      stopStreaming,
+      streaming,
+      toolEvents,
+    ]
   )
 
-  const promptPanel = (
+  const promptPanel = useMemo(
+    () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={10}>
         <Card title="保存 Prompt 模板">
@@ -691,13 +781,39 @@ export default function ProjectAgentsPage() {
         </Card>
       </Col>
     </Row>
+    ),
+    [promptForm, promptMutation, promptsQuery.data, promptsQuery.isLoading, selectedAgent]
+  )
+
+  const tabItems = useMemo(
+    () => [
+      {
+        key: 'manage',
+        label: '管理',
+        children: managementPanel,
+      },
+      {
+        key: 'chat',
+        label: '对话',
+        children: chatPanel,
+      },
+      {
+        key: 'prompts',
+        label: 'Prompt 模板',
+        children: promptPanel,
+      },
+    ],
+    [chatPanel, managementPanel, promptPanel]
   )
 
   return (
     <div>
       {contextHolder}
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 24 }} align="center">
-        <h2 style={{ margin: 0 }}>Agent</h2>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 20 }} align="start">
+        <Space direction="vertical" size={4}>
+          <h2 style={{ margin: 0 }}>Agent 工作区</h2>
+          <Text type="secondary">管理 Agent、绑定推理工具，并用流式对话验证业务解释能力。</Text>
+        </Space>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => agentsQuery.refetch()} loading={agentsQuery.isFetching}>
             刷新
@@ -711,23 +827,7 @@ export default function ProjectAgentsPage() {
       {!projectId && <Alert type="warning" showIcon message="未选择项目" style={{ marginBottom: 16 }} />}
 
       <Tabs
-        items={[
-          {
-            key: 'manage',
-            label: '管理',
-            children: managementPanel,
-          },
-          {
-            key: 'chat',
-            label: '对话',
-            children: chatPanel,
-          },
-          {
-            key: 'prompts',
-            label: 'Prompt 模板',
-            children: promptPanel,
-          },
-        ]}
+        items={tabItems}
       />
 
       <Modal
