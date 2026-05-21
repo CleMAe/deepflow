@@ -12,10 +12,10 @@ from app.core.errors import ERR_DATASET_INVALID_PARAM, AppError
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.eda import EdaRequest
 from app.services.data_parser import PandasDataParser
+from app.services.eda_report_store import load_report, save_report
 from shared.protocols import DataParserProtocol, DatasetFormat
 
-# Module-level in-memory cache (shared across requests; lost on process restart).
-# Day2/3 acceptable; persist to DB or meta.json in a later iteration.
+# In-memory cache; also persisted to eda_report.json beside the dataset file.
 _REPORT_CACHE: dict[str, dict[str, Any]] = {}
 
 
@@ -206,12 +206,21 @@ class PandasEdaService:
             columns=body.columns or None,
             include_visualizations=body.include_visualizations,
         )
-        _REPORT_CACHE[self._cache_key(project_id, dataset_id)] = report
+        key = self._cache_key(project_id, dataset_id)
+        _REPORT_CACHE[key] = report
+        if row.file_path:
+            save_report(row.file_path, report)
         return report
 
     def get_report(self, project_id: uuid.UUID, dataset_id: uuid.UUID) -> dict[str, Any]:
         key = self._cache_key(project_id, dataset_id)
         report = _REPORT_CACHE.get(key)
-        if not report:
-            raise AppError.not_found("EDA report not found; run POST /eda first")
-        return report
+        if report:
+            return report
+        row, _ = self._load_dataset(project_id, dataset_id)
+        if row.file_path:
+            report = load_report(row.file_path)
+            if report:
+                _REPORT_CACHE[key] = report
+                return report
+        raise AppError.not_found("EDA report not found; run POST /eda first")
