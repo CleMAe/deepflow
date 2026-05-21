@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from shared.protocols import ToolType
-
 
 # ── Request models ─────────────────────────────────────────────
 

@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_id, get_db
-from app.core.errors import ERR_AUTH_CREDENTIALS, ERR_AUTH_INVALID, ERR_AUTH_USERNAME_EXISTS, AppError
+from app.core.errors import (
+    ERR_AUTH_CREDENTIALS,
+    ERR_AUTH_INVALID,
+    ERR_AUTH_USERNAME_EXISTS,
+    AppError,
+)
 from app.core.response import success
 from app.core.security import (
     create_access_token,
@@ -18,7 +23,7 @@ from app.core.security import (
     verify_password,
 )
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair, UserOut
-from src.infra.db.models.user import User, UserRole
+from src.infra.db.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 

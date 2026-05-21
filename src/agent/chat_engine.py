@@ -7,11 +7,10 @@ import uuid
 from typing import Any, AsyncIterator
 
 from app.core.config import settings
-from app.core.errors import AppError, ERR_AGENT_CHAT_FAILED, ERR_AGENT_TOOL_ROUND_LIMIT
+from shared.protocols import ChatRole, SSEEvent, SSEEventType
 from src.agent.llm_provider import get_llm_provider
 from src.agent.repository import AgentRepository
 from src.agent.tool_wrapper import ToolWrapper
-from shared.protocols import ChatRole, SSEEvent, SSEEventType
 
 
 class ChatEngine:

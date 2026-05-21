@@ -7,19 +7,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import (
+    ERR_MODEL_NOT_FOUND,
+    ERR_TRAINING_INVALID_TRANSITION,
+    ERR_TRAINING_JOB_NOT_FOUND,
+    AppError,
+)
+from app.schemas.training import CheckpointOut, TrainingJobCreate, TrainingJobOut, TrainingLogOut
 from src.engine.manager import TrainingEngineManager
 from src.infra.db.models.dataset import Dataset
 from src.infra.db.models.ml_model import MLModel
 from src.infra.db.models.training_job import TrainingJob, TrainingJobStatus
 from src.shared.protocols import StorageProtocol
-
-from app.core.errors import AppError, ERR_TRAINING_JOB_NOT_FOUND, ERR_TRAINING_INVALID_TRANSITION, ERR_MODEL_NOT_FOUND
-from app.schemas.training import TrainingJobCreate, TrainingJobOut, CheckpointOut, TrainingLogOut
 
 # State machine: valid transitions
 _VALID_TRANSITIONS: dict[TrainingJobStatus, set[TrainingJobStatus]] = {

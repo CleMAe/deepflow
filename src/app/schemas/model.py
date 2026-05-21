@@ -6,7 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # --- Library models (read-only registry) ---
 
 class LibraryModel(BaseModel):
