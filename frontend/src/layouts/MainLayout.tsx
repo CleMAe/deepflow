@@ -72,10 +72,18 @@ export default function MainLayout() {
   const selectedKey = location.pathname
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider trigger={null} collapsible collapsed={collapsed} theme="light">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>
-          DeepFlow
+    <Layout className="deepflow-layout">
+      <Sider
+        className="deepflow-sider"
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
+        breakpoint="lg"
+        onBreakpoint={setCollapsed}
+        theme="light"
+      >
+        <div className="deepflow-logo">
+          {collapsed ? 'DF' : 'DeepFlow'}
         </div>
         <Menu
           mode="inline"
@@ -85,7 +93,7 @@ export default function MainLayout() {
         />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Header className="deepflow-header">
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -101,7 +109,7 @@ export default function MainLayout() {
             <Avatar icon={<UserOutlined />} style={{ cursor: 'pointer' }} />
           </Dropdown>
         </Header>
-        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8 }}>
+        <Content className="deepflow-content">
           <Outlet />
         </Content>
       </Layout>
