@@ -5,14 +5,15 @@ from __future__ import annotations
 import uuid
 
 import pytest
-import torch
-import torch.nn as nn
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from src.infra.db.models.ml_model import MLModel
 from src.infra.db.models.user import User
 from tests.factories.project import ProjectFactory
+
+torch = pytest.importorskip("torch")
+nn = pytest.importorskip("torch.nn")
 
 
 @pytest.fixture
