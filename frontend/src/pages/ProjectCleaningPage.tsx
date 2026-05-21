@@ -31,7 +31,7 @@ export default function ProjectCleaningPage() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 24 }}>数据清洗 & EDA</h2>
+      <h2 style={{ marginBottom: 24 }}>数据清洗 · EDA · 数据增强</h2>
       <Card>
         <Tabs items={items} />
       </Card>

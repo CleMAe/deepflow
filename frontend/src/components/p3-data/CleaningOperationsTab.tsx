@@ -16,6 +16,8 @@ import {
   message,
 } from 'antd'
 import { listDatasets, type Dataset } from '@/api/datasets'
+import { datasetOptionLabel, isTabularDataset } from '@/components/p3-data/datasetFormat'
+import { formatApiError } from '@/lib/formatApiError'
 import {
   cleanDedup,
   cleanEncode,
@@ -63,7 +65,7 @@ function ResultAlert({ result }: { result: CleaningResult | null }) {
       type="success"
       showIcon
       style={{ marginTop: 16 }}
-      message="执行结果（Mock）"
+      message="执行结果"
       description={
         <Space direction="vertical" size={4}>
           <Text>
@@ -95,13 +97,18 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
     enabled: !!projectId,
   })
 
+  const tabularItems = useMemo(
+    () => (datasetsQuery.data?.items ?? []).filter((d: Dataset) => isTabularDataset(d)),
+    [datasetsQuery.data?.items],
+  )
+
   const options = useMemo(
     () =>
-      (datasetsQuery.data?.items ?? []).map((d: Dataset) => ({
+      tabularItems.map((d: Dataset) => ({
         value: d.id!,
-        label: `${d.name ?? d.id} (${d.format ?? '?'})`,
+        label: datasetOptionLabel(d),
       })),
-    [datasetsQuery.data?.items],
+    [tabularItems],
   )
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['datasets', projectId] })
@@ -113,7 +120,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('缺失值处理已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const outlierMut = useMutation({
@@ -123,7 +130,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('异常值处理已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const dedupMut = useMutation({
@@ -133,7 +140,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('去重已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const encodeMut = useMutation({
@@ -143,7 +150,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('编码转换已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const typeMut = useMutation({
@@ -153,7 +160,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('类型转换已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const requireDs = () => {
@@ -164,8 +171,26 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
     return true
   }
 
+  if (datasetsQuery.isError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="无法加载数据集"
+        description={formatApiError(datasetsQuery.error, '请从工作台进入 Demo Project')}
+      />
+    )
+  }
+
   return (
     <div>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="仅支持 CSV / JSON 表格数据集"
+        description="图像数据集请使用「数据增强」页；清洗结果会写回数据集文件。"
+      />
       <Space wrap style={{ marginBottom: 16 }}>
         <Text>当前数据集：</Text>
         <Select

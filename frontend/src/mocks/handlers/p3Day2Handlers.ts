@@ -78,8 +78,16 @@ export const p3Day2Handlers = [
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || 1)
     const pageSize = Number(url.searchParams.get('page_size') || 12)
+    const label = url.searchParams.get('label')
     const dsId = params.dsId as string
-    const data = mockImages(dsId, page, pageSize)
+    let data = mockImages(dsId, page, pageSize)
+    if (label) {
+      data = {
+        ...data,
+        items: data.items.filter((item) => (item.labels ?? []).includes(label)),
+        total: data.items.filter((item) => (item.labels ?? []).includes(label)).length,
+      }
+    }
     return HttpResponse.json({
       code: 0,
       message: 'success',

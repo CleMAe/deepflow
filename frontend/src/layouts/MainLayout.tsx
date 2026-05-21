@@ -35,7 +35,7 @@ export default function MainLayout() {
         {
           key: `/projects/${projectId}/cleaning`,
           icon: <ClearOutlined />,
-          label: '清洗 & EDA',
+          label: '清洗 · EDA · 增强',
         },
         {
           key: `/projects/${projectId}/models`,
