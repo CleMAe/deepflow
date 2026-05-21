@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { buildTrainingWebSocketUrl } from '@/config/env'
 import type { TrainingMetricsPoint } from '@/hooks/useTrainingMetricsMock'
 
 export type TrainingWsMessage = {
@@ -52,9 +53,7 @@ export function useTrainingWebSocket(
     epochRef.current = 0
 
     const token = localStorage.getItem('access_token')
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const qs = token ? `?token=${encodeURIComponent(token)}` : ''
-    const url = `${protocol}//${window.location.host}/api/v1/ws/training/${jobId}${qs}`
+    const url = buildTrainingWebSocketUrl(jobId, { token })
 
     const ws = new WebSocket(url)
 
