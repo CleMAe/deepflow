@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -9,8 +11,14 @@ import httpx
 from PIL import Image
 
 BASE = "http://127.0.0.1:8000/api/v1"
-PROJECT = "11111111-1111-1111-1111-111111111111"
+DEFAULT_DEMO_PROJECT = "11111111-1111-1111-1111-111111111111"
 CSV = "name,age,score,label\nAlice,30,88,A\nBob,25,92,B\nCharlie,35,70,A\nDiana,28,85,B\nEve,32,90,A\n"
+
+
+def resolve_project_id(cli_value: str | None) -> str:
+    if cli_value:
+        return cli_value
+    return os.environ.get("DEEPFLOW_SMOKE_PROJECT", DEFAULT_DEMO_PROJECT)
 
 
 def ok(resp: httpx.Response, step: str) -> dict:
@@ -25,30 +33,41 @@ def ok(resp: httpx.Response, step: str) -> dict:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Day3 API smoke test")
+    parser.add_argument(
+        "--project-id",
+        default=None,
+        help="Project UUID (default: DEEPFLOW_SMOKE_PROJECT env or demo seed project)",
+    )
+    parser.add_argument("--base-url", default=BASE, help="API base URL")
+    args = parser.parse_args()
+    project = resolve_project_id(args.project_id)
+    base = args.base_url.rstrip("/")
+
     client = httpx.Client(timeout=60.0)
 
-    ok(client.get(f"{BASE}/health"), "health")
+    ok(client.get(f"{base}/health"), "health")
     print("OK health")
 
     files = {"file": ("day3_test.csv", CSV.encode("utf-8"), "text/csv")}
     form = {"name": "day3_test", "tags": "smoke,day3"}
-    ds = ok(client.post(f"{BASE}/projects/{PROJECT}/datasets/upload", files=files, data=form), "upload")
+    ds = ok(client.post(f"{base}/projects/{project}/datasets/upload", files=files, data=form), "upload")
     ds_id = ds["id"]
     assert ds["num_samples"] == 5, ds
     print(f"OK upload ds_id={ds_id}")
 
     eda_run = client.post(
-        f"{BASE}/projects/{PROJECT}/datasets/{ds_id}/eda",
+        f"{base}/projects/{project}/datasets/{ds_id}/eda",
         json={"include_visualizations": False},
     )
     ok(eda_run, "eda")
-    report = ok(client.get(f"{BASE}/projects/{PROJECT}/datasets/{ds_id}/eda/report"), "eda/report")
+    report = ok(client.get(f"{base}/projects/{project}/datasets/{ds_id}/eda/report"), "eda/report")
     assert report["summary"]["num_rows"] == 5, report
     print("OK eda + report")
 
     freq = ok(
         client.post(
-            f"{BASE}/projects/{PROJECT}/datasets/{ds_id}/clean/encode",
+            f"{base}/projects/{project}/datasets/{ds_id}/clean/encode",
             json={"columns": ["name"], "method": "frequency_encoding"},
         ),
         "encode/frequency",
@@ -58,7 +77,7 @@ def main() -> None:
 
     target = ok(
         client.post(
-            f"{BASE}/projects/{PROJECT}/datasets/{ds_id}/clean/encode",
+            f"{base}/projects/{project}/datasets/{ds_id}/clean/encode",
             json={"columns": ["label"], "method": "target_encoding", "target_column": "score"},
         ),
         "encode/target",
@@ -68,7 +87,7 @@ def main() -> None:
 
     split = ok(
         client.post(
-            f"{BASE}/projects/{PROJECT}/datasets/{ds_id}/split",
+            f"{base}/projects/{project}/datasets/{ds_id}/split",
             json={"ratios": {"train": 0.6, "val": 0.2, "test": 0.2}, "random_seed": 42},
         ),
         "split",
@@ -80,7 +99,7 @@ def main() -> None:
     )
 
     train_get = ok(
-        client.get(f"{BASE}/projects/{PROJECT}/datasets/{split['train_dataset_id']}"),
+        client.get(f"{base}/projects/{project}/datasets/{split['train_dataset_id']}"),
         "get train split",
     )
     assert train_get["num_samples"] == split["train_count"], train_get
@@ -88,20 +107,20 @@ def main() -> None:
 
     create = ok(
         client.post(
-            f"{BASE}/projects/{PROJECT}/datasets",
+            f"{base}/projects/{project}/datasets",
             json={"name": "day3_img", "format": "image", "tags": ["smoke"]},
         ),
         "create image dataset",
     )
     img_ds_id = create["id"]
-    detail = ok(client.get(f"{BASE}/projects/{PROJECT}/datasets/{img_ds_id}"), "get image dataset")
+    detail = ok(client.get(f"{base}/projects/{project}/datasets/{img_ds_id}"), "get image dataset")
     raw_dir = Path(detail["file_path"])
     raw_dir.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (64, 64), color=(100, 150, 200)).save(raw_dir / "sample_a.jpg")
 
     gallery = ok(
         client.get(
-            f"{BASE}/projects/{PROJECT}/datasets/{img_ds_id}/images",
+            f"{base}/projects/{project}/datasets/{img_ds_id}/images",
             params={"page": 1, "page_size": 10},
         ),
         "images",
@@ -112,7 +131,7 @@ def main() -> None:
 
     labels = ok(
         client.put(
-            f"{BASE}/projects/{PROJECT}/datasets/{img_ds_id}/labels",
+            f"{base}/projects/{project}/datasets/{img_ds_id}/labels",
             json={"items": [{"filename": fname, "labels": ["cat", "indoor"]}]},
         ),
         "labels",
@@ -121,7 +140,7 @@ def main() -> None:
 
     gallery2 = ok(
         client.get(
-            f"{BASE}/projects/{PROJECT}/datasets/{img_ds_id}/images",
+            f"{base}/projects/{project}/datasets/{img_ds_id}/images",
             params={"page": 1, "page_size": 10},
         ),
         "images after labels",

@@ -59,9 +59,21 @@ def stable_image_id(project_id: uuid.UUID, dataset_id: uuid.UUID, filename: str)
     return uuid.uuid5(uuid.NAMESPACE_URL, f"{project_id}:{dataset_id}:{filename}")
 
 
-def image_dimensions(path: Path) -> tuple[int, int]:
+def image_dimensions(path: Path) -> tuple[int, int] | None:
+    """Return (width, height) or None if the file is not a readable image."""
     try:
         with Image.open(path) as img:
             return img.size
-    except Exception:
-        return 0, 0
+    except OSError:
+        return None
+
+
+def iter_readable_images(file_path: str) -> list[tuple[Path, int, int]]:
+    """List image files with valid dimensions; skip unreadable files."""
+    readable: list[tuple[Path, int, int]] = []
+    for path in _list_image_paths(file_path):
+        dims = image_dimensions(path)
+        if dims is not None:
+            w, h = dims
+            readable.append((path, w, h))
+    return readable

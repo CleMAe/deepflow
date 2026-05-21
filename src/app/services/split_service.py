@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM
+from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM, ERR_DATASET_NOT_FOUND
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.eda import SplitRequest, SplitResultSchema
 from app.services.data_parser import PandasDataParser, columns_meta_to_db
@@ -92,7 +92,7 @@ class PandasSplitService:
     def _require_source(self, project_id: uuid.UUID, dataset_id: uuid.UUID):
         row = self._repo.get_by_id_and_project(dataset_id, project_id)
         if not row:
-            raise AppError.not_found("Dataset not found")
+            raise AppError.not_found("Dataset not found", code=ERR_DATASET_NOT_FOUND)
         fmt_value = row.format.value if hasattr(row.format, "value") else str(row.format)
         if fmt_value not in ("csv", "json"):
             raise AppError.bad_request(
@@ -156,15 +156,12 @@ class PandasSplitService:
             body.ratios.test,
         )
 
-        if body.stratify_column:
-            df = self._parser.load_dataframe(source.file_path, fmt)  # type: ignore[union-attr]
-            if body.stratify_column not in df.columns:
-                raise AppError.bad_request(
-                    f"Stratify column not found: {body.stratify_column}",
-                    code=ERR_DATASET_INVALID_PARAM,
-                )
-        else:
-            df = self._parser.load_dataframe(source.file_path, fmt)  # type: ignore[union-attr]
+        df = self._parser.load_dataframe(source.file_path, fmt)  # type: ignore[union-attr]
+        if body.stratify_column and body.stratify_column not in df.columns:
+            raise AppError.bad_request(
+                f"Stratify column not found: {body.stratify_column}",
+                code=ERR_DATASET_INVALID_PARAM,
+            )
 
         train_df, val_df, test_df = _split_dataframe(
             df,

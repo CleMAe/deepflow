@@ -281,7 +281,10 @@ class PandasCleaningEngine:
                     code=ERR_DATASET_INVALID_PARAM,
                 )
             if not pd.api.types.is_numeric_dtype(df[target]):
-                df[target] = pd.Categorical(df[target]).codes
+                raise AppError.bad_request(
+                    "target_encoding requires a numeric target_column",
+                    code=ERR_DATASET_INVALID_PARAM,
+                )
             global_mean = float(df[target].mean())
             for col in columns_affected:
                 means = df.groupby(col, dropna=False)[target].mean()

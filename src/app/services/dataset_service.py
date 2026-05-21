@@ -114,21 +114,19 @@ class DatasetService:
         row = self._require_row(project_id, dataset_id)
         from app.schemas.dataset import ImageItemSchema
         from app.services.image_gallery import (
-            image_dimensions,
+            iter_readable_images,
             load_labels_map,
             stable_image_id,
-            _list_image_paths,
         )
 
-        paths = _list_image_paths(row.file_path or "")
-        total = len(paths)
+        readable = iter_readable_images(row.file_path or "")
+        total = len(readable)
         start = (page - 1) * page_size
         end = start + page_size
         labels_map = load_labels_map(row.file_path or "")
         items = []
-        for path in paths[start:end]:
+        for path, w, h in readable[start:end]:
             filename = path.name
-            w, h = image_dimensions(path)
             items.append(
                 ImageItemSchema(
                     id=stable_image_id(project_id, dataset_id, filename),
