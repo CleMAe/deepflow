@@ -31,26 +31,31 @@ _lock = threading.Lock()
 
 def _import_torch():
     import torch
+
     return torch
 
 
 def _import_nn():
     import torch.nn as nn
+
     return nn
 
 
 def _import_numpy():
     import numpy as np
+
     return np
 
 
 def _import_build_model():
     from src.engine.train_worker import _build_model
+
     return _build_model
 
 
 def _import_is_cv_arch():
     from src.engine.train_worker import _is_cv_arch
+
     return _is_cv_arch
 
 
