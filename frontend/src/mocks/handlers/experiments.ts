@@ -69,6 +69,25 @@ export const experimentHandlers = [
     return HttpResponse.json({ code: 0, message: 'success', data: exp, request_id: 'mock-experiments-get' })
   }),
 
+  http.put('/api/v1/projects/:projectId/experiments/:expId', async ({ params, request }) => {
+    const body = (await request.json()) as { tags?: string[]; notes?: string }
+    const index = mockExperiments.findIndex((e) => e.id === params.expId)
+    if (index < 0) {
+      return HttpResponse.json({ code: 40020001, message: 'experiment not found' }, { status: 404 })
+    }
+    mockExperiments[index] = {
+      ...mockExperiments[index],
+      tags: body.tags ?? mockExperiments[index].tags,
+      notes: body.notes ?? mockExperiments[index].notes,
+    }
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: mockExperiments[index],
+      request_id: 'mock-experiments-update',
+    })
+  }),
+
   http.post('/api/v1/projects/:projectId/experiments/compare', async ({ request }) => {
     const body = (await request.json()) as { experiment_ids: string[] }
     const selected = mockExperiments.filter((e) => body.experiment_ids.includes(e.id!))

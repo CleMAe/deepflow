@@ -2,9 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { isRealApiMode } from '@/lib/apiMode'
 
 async function enableMocking() {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && !isRealApiMode()) {
     const { worker } = await import('./mocks/browser')
     return worker.start({
       onUnhandledRequest: 'bypass',
