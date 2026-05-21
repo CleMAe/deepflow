@@ -6,7 +6,8 @@ from app.api.v1.datasets.router import router as datasets_router
 from app.api.v1.eda.router import router as eda_router
 from app.api.v1.experiments.router import router as experiments_router
 from app.api.v1.inference.router import router as inference_router
-from app.api.v1.models.router import library_router, router as models_router
+from app.api.v1.models.router import library_router
+from app.api.v1.models.router import router as models_router
 from app.api.v1.projects.router import router as projects_router
 from app.api.v1.training.router import router as training_router
 from app.api.v1.ws.router import router as ws_router

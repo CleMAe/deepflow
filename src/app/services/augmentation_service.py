@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM
+from app.core.errors import ERR_DATASET_INVALID_PARAM, AppError
 from app.repositories.dataset_repository import DatasetRepository
 from app.schemas.eda import AugmentRequest
 from shared.protocols import StorageProtocol
