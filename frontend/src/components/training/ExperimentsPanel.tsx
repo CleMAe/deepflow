@@ -23,6 +23,7 @@ import {
   updateExperiment,
   type Experiment,
 } from '@/api/experiments'
+import { buildExperimentCompareChartOption } from '@/utils/experimentCompareChart'
 
 const { Text } = Typography
 
@@ -75,21 +76,10 @@ export default function ExperimentsPanel({ projectId }: { projectId: string }) {
     onError: (error) => message.error(getErrorMessage(error)),
   })
 
-  const compareChartOption = useMemo(() => {
-    const mc = compareResult?.metric_comparison ?? {}
-    const keys = Object.keys(mc)
-    if (!keys.length) return null
-    return {
-      tooltip: { trigger: 'axis' },
-      legend: { data: selectedIds },
-      xAxis: { type: 'category', data: keys },
-      series: selectedIds.map((id, index) => ({
-        name: listQuery.data?.items?.find((e) => e.id === id)?.name ?? id,
-        type: 'bar',
-        data: keys.map((k) => mc[k]?.[index] ?? 0),
-      })),
-    }
-  }, [compareResult, selectedIds, listQuery.data])
+  const compareChartOption = useMemo(
+    () => buildExperimentCompareChartOption(compareResult),
+    [compareResult],
+  )
 
   const columns: ColumnsType<Experiment> = [
     { title: '名称', dataIndex: 'name', key: 'name' },

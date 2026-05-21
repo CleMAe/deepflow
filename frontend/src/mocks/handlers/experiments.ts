@@ -90,16 +90,21 @@ export const experimentHandlers = [
 
   http.post('/api/v1/projects/:projectId/experiments/compare', async ({ request }) => {
     const body = (await request.json()) as { experiment_ids: string[] }
-    const selected = mockExperiments.filter((e) => body.experiment_ids.includes(e.id!))
-    const metricComparison: Record<string, number[]> = {}
+    const selected = body.experiment_ids
+      .map((id) => mockExperiments.find((e) => e.id === id))
+      .filter((e): e is Experiment => Boolean(e))
+
+    const metricKeys = new Set<string>()
     selected.forEach((exp) => {
-      Object.entries(exp.metrics ?? {}).forEach(([key, val]) => {
-        if (typeof val === 'number') {
-          if (!metricComparison[key]) metricComparison[key] = []
-          metricComparison[key].push(val)
-        }
-      })
+      Object.keys(exp.metrics ?? {}).forEach((key) => metricKeys.add(key))
     })
+    const metricComparison: Record<string, number[]> = {}
+    for (const key of metricKeys) {
+      metricComparison[key] = selected.map((exp) => {
+        const val = (exp.metrics ?? {})[key]
+        return typeof val === 'number' ? val : 0
+      })
+    }
     return HttpResponse.json({
       code: 0,
       message: 'success',

@@ -80,12 +80,14 @@ class ExperimentService:
             select(Experiment)
             .where(Experiment.project_id == project_id, Experiment.id.in_(uuids))
         ).all()
+        by_id = {e.id: e for e in exps}
+        ordered_exps = [by_id[u] for u in uuids if u in by_id]
 
-        exp_outs = [_exp_to_out(e) for e in exps]
+        exp_outs = [_exp_to_out(e) for e in ordered_exps]
 
         # Build metric comparison
         all_metrics: set[str] = set()
-        for e in exps:
+        for e in ordered_exps:
             if e.metrics and isinstance(e.metrics, dict):
                 all_metrics.update(e.metrics.keys())
 
@@ -93,7 +95,7 @@ class ExperimentService:
         for metric_name in sorted(all_metrics):
             metric_comparison[metric_name] = [
                 (e.metrics or {}).get(metric_name) if isinstance(e.metrics, dict) else None
-                for e in exps
+                for e in ordered_exps
             ]
 
         return ExperimentComparison(
