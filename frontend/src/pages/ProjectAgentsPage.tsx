@@ -50,11 +50,12 @@ import {
   type PromptTemplate,
   type PromptTemplateCreate,
 } from '@/api/agents'
+import { shouldEnableMsw } from '@/config/env'
 import { listInferenceModels, type Model } from '@/api/inference'
 
 const { Paragraph, Text } = Typography
 const MAX_TOOL_EVENTS = 40
-const DEFAULT_CONVERSATION_ID = 'conversation-mock-1'
+const MOCK_CONVERSATION_ID = 'conversation-mock-1'
 
 type AgentModelConfig = NonNullable<AgentCreate['model_config']>
 type AgentProvider = AgentModelConfig['provider']
@@ -146,6 +147,15 @@ function getChatConversationId(value?: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
     ? trimmed
     : undefined
+}
+
+function getHistoryConversationId(value: string, mockEnabled: boolean) {
+  const uuid = getChatConversationId(value)
+  if (uuid) {
+    return uuid
+  }
+
+  return mockEnabled && value.trim() === MOCK_CONVERSATION_ID ? MOCK_CONVERSATION_ID : undefined
 }
 
 function modelLabel(model: Model) {
@@ -386,6 +396,7 @@ export default function ProjectAgentsPage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
   const [messageApi, contextHolder] = message.useMessage()
+  const mockEnabled = useMemo(() => shouldEnableMsw(), [])
   const [createOpen, setCreateOpen] = useState(false)
   const [bindOpen, setBindOpen] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string>()
@@ -393,7 +404,9 @@ export default function ProjectAgentsPage() {
   const [chatInput, setChatInput] = useState(
     '请结合已绑定模型工具，分析最近一次批量推理中的异常样本。'
   )
-  const [conversationId, setConversationId] = useState(DEFAULT_CONVERSATION_ID)
+  const [conversationId, setConversationId] = useState(() =>
+    shouldEnableMsw() ? MOCK_CONVERSATION_ID : ''
+  )
   const [chatMessages, setChatMessages] = useState<LocalChatMessage[]>([])
   const [toolEvents, setToolEvents] = useState<ToolTimelineItem[]>([])
   const [streaming, setStreaming] = useState(false)
@@ -457,15 +470,20 @@ export default function ProjectAgentsPage() {
     enabled: !!projectId && !!selectedAgent?.id,
   })
 
+  const historyConversationId = useMemo(
+    () => getHistoryConversationId(conversationId, mockEnabled),
+    [conversationId, mockEnabled]
+  )
+
   const historyQuery = useQuery({
-    queryKey: ['p5-agent-history', projectId, selectedAgent?.id, conversationId],
+    queryKey: ['p5-agent-history', projectId, selectedAgent?.id, historyConversationId],
     queryFn: () =>
       getChatHistory(projectId!, selectedAgent!.id!, {
-        conversationId: conversationId.trim() || undefined,
+        conversationId: historyConversationId!,
         page: 1,
         pageSize: 50,
       }),
-    enabled: !!projectId && !!selectedAgent?.id && !!conversationId.trim(),
+    enabled: !!projectId && !!selectedAgent?.id && !!historyConversationId,
   })
 
   const modelOptions = useMemo(
@@ -1163,12 +1181,17 @@ export default function ProjectAgentsPage() {
                 onChange={(event) => setConversationId(event.target.value)}
                 placeholder="输入 conversation_id"
               />
+              {conversationId.trim() && !historyConversationId && (
+                <Text type="warning" style={{ fontSize: 12 }}>
+                  真实后端需要 UUID 格式的 conversation_id
+                </Text>
+              )}
               <Button
                 block
                 icon={<ReloadOutlined />}
                 onClick={() => historyQuery.refetch()}
                 loading={historyQuery.isFetching}
-                disabled={!selectedAgent || !conversationId.trim()}
+                disabled={!selectedAgent || !historyConversationId}
               >
                 刷新日志
               </Button>
@@ -1177,7 +1200,7 @@ export default function ProjectAgentsPage() {
                   {historyQuery.data?.total ?? historyMessages.length}
                 </Descriptions.Item>
                 <Descriptions.Item label="会话 ID">
-                  {historyQuery.data?.conversation_id ?? conversationId}
+                  {historyQuery.data?.conversation_id ?? historyConversationId ?? '-'}
                 </Descriptions.Item>
               </Descriptions>
             </Space>
@@ -1201,6 +1224,7 @@ export default function ProjectAgentsPage() {
       agentOptions,
       agentsQuery.isLoading,
       conversationId,
+      historyConversationId,
       historyMessages,
       historyQuery,
       selectedAgent,
