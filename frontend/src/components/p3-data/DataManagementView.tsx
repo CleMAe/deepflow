@@ -72,12 +72,11 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
   })
 
   const imagesQuery = useQuery({
-    queryKey: ['dataset-images', projectId, activeDataset?.id, galleryPage, galleryPageSize, galleryLabelFilter],
+    queryKey: ['dataset-images', projectId, activeDataset?.id, galleryPage, galleryPageSize],
     queryFn: () =>
       listDatasetImages(projectId, activeDataset!.id!, {
         page: galleryPage,
         page_size: galleryPageSize,
-        label: galleryLabelFilter,
       }),
     enabled: !!projectId && !!activeDataset?.id && galleryOpen && activeDataset.format === 'image',
   })
@@ -394,10 +393,7 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
             style={{ minWidth: 160 }}
             options={galleryLabelOptions}
             value={galleryLabelFilter}
-            onChange={(v) => {
-              setGalleryLabelFilter(v)
-              setGalleryPage(1)
-            }}
+            onChange={setGalleryLabelFilter}
           />
         </Space>
         <Image.PreviewGroup>
@@ -462,7 +458,9 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
             下一页
           </Button>
           <Text type="secondary">
-            第 {galleryPage} 页 · 本页 {galleryItems.length} 张 · 共 {imagesQuery.data?.total ?? 0} 张
+            第 {galleryPage} 页 · 本页显示 {galleryItems.length} 张
+            {galleryLabelFilter ? `（已筛选「${galleryLabelFilter}」）` : ''} · 数据集共{' '}
+            {imagesQuery.data?.total ?? 0} 张
           </Text>
         </Space>
       </Modal>
