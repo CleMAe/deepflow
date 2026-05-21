@@ -1,10 +1,11 @@
 import axios from 'axios'
 import type { components } from '@/api/types'
+import { getApiBaseUrl } from '@/config/env'
 
 type ApiResponse<T> = Omit<components['schemas']['ApiResponse'], 'data'> & { data: T }
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: getApiBaseUrl(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

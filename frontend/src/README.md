@@ -7,7 +7,22 @@
 
 ## 1. HTTP 层 — `src/lib/axios.ts`
 
-Axios 实例已封装好 baseURL、JWT 注入、token 刷新。
+Axios 实例已封装好 baseURL、JWT 注入、token 刷新。baseURL 由 `VITE_API_BASE_URL` 控制，未配置时默认 `/api/v1`。
+
+### Day3 联调环境变量
+
+本地开发可复制 `frontend/.env.example` 为 `frontend/.env`：
+
+```bash
+VITE_API_BASE_URL=/api/v1
+VITE_ENABLE_MSW=true
+```
+
+| 场景 | 配置 | 说明 |
+|------|------|------|
+| Mock 开发 | `VITE_ENABLE_MSW=true` | 开发环境启动 MSW，P3/P4/P5 可继续使用各自 handler |
+| 真实后端联调 | `VITE_ENABLE_MSW=false` | 关闭 MSW，请求走真实后端 |
+| 直连后端端口 | `VITE_API_BASE_URL=http://localhost:8000/api/v1` | Vite dev server 不代理时使用 |
 
 ```tsx
 import api from '@/lib/axios'
@@ -71,7 +86,7 @@ const project = useProjectStore((s) => s.currentProject)
 
 ### `<FileUpload>`
 
-基础拖拽上传组件，内部使用 Ant Design Upload.Dragger。
+拖拽上传组件，内部使用 Ant Design Upload.Dragger，并统一走后端分片上传流程。
 
 ```tsx
 import FileUpload from '@/components/common/FileUpload'
@@ -91,7 +106,7 @@ import FileUpload from '@/components/common/FileUpload'
 | `accept` | `string` | ❌ | 接受的文件类型 |
 | `onSuccess` | `(files) => void` | ❌ | 上传成功回调 |
 
-**注意**：分片上传（`upload/init → chunk → complete`）尚未实现，Day 2 补齐。
+**注意**：分片上传流程为 `upload/init → upload/{uid}/chunk → upload/{uid}/complete`，页面不要自行实现上传链路。
 
 ### `<DataTable>`
 
@@ -138,7 +153,7 @@ type Dataset = components['schemas']['Dataset']
 
 ## 5. Mock 服务 — `src/mocks/`
 
-MSW 在开发环境自动启动，拦截以下接口：
+MSW 只在 `import.meta.env.DEV` 且 `VITE_ENABLE_MSW !== 'false'` 时启动。Day3 联调真实后端时，不要删除 handler，改用环境变量关闭 MSW。
 
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register`
@@ -150,7 +165,7 @@ MSW 在开发环境自动启动，拦截以下接口：
 - `GET /api/v1/projects/:projectId/datasets`
 - `GET /api/v1/projects/:projectId/datasets/:dsId`
 
-**各模块自行补充 handler**：在 `src/mocks/handlers/` 下新建文件，然后在 `browser.ts` 中注册。
+**各模块自行维护 handler**：P3/P4/P5 在 `src/mocks/handlers/` 下维护各自 mock 文件，P2 只维护统一启动开关和注册入口。
 
 ---
 
