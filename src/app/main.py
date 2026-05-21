@@ -22,8 +22,8 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.exception_handlers import register_exception_handlers
 from app.core.errors import ERR_SYSTEM_DB_UNAVAILABLE
+from app.core.exception_handlers import register_exception_handlers
 from app.core.response import failure, success
 from app.db.seed import seed_demo_datasets, seed_demo_project, seed_demo_user
 from app.db.session import get_db, init_db

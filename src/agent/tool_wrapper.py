@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from app.core.errors import AppError, ERR_AGENT_TOOL_NOT_FOUND
-from src.agent.repository import AgentRepository
+from app.core.errors import ERR_AGENT_TOOL_NOT_FOUND, AppError
 from shared.protocols import ToolType
+from src.agent.repository import AgentRepository
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
     from app.services.inference_service import InferenceService
 
 

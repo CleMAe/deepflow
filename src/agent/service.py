@@ -6,18 +6,16 @@ import uuid
 from typing import Any
 
 from app.core.errors import (
-    AppError,
-    ERR_AGENT_CHAT_FAILED,
-    ERR_AGENT_INVALID_PARAM,
     ERR_AGENT_INVALID_STATUS,
     ERR_AGENT_NOT_FOUND,
     ERR_AGENT_TOOL_BIND_FAILED,
+    AppError,
 )
+from shared.protocols import ToolType
 from src.agent.repository import AgentRepository
 from src.agent.schemas import AgentCreate, AgentUpdate, ToolBindItem
 from src.infra.db.models import Agent
 from src.infra.db.models.agent import AgentStatus
-from shared.protocols import ToolType
 
 
 class AgentService:

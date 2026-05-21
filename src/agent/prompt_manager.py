@@ -6,7 +6,7 @@ import uuid
 from string import Template
 from typing import Any
 
-from app.core.errors import AppError, ERR_AGENT_NOT_FOUND, ERR_AGENT_PROMPT_RENDER_FAILED
+from app.core.errors import ERR_AGENT_NOT_FOUND, ERR_AGENT_PROMPT_RENDER_FAILED, AppError
 from src.agent.repository import AgentRepository
 from src.agent.schemas import PromptCreate
 

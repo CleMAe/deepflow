@@ -10,7 +10,6 @@ from src.infra.db.base import Base, TimestampUpdateMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from src.infra.db.models.agent import Agent
-    from src.infra.db.models.project import Project
 
 
 class Conversation(UUIDPrimaryKeyMixin, TimestampUpdateMixin, Base):

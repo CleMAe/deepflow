@@ -9,10 +9,9 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.infra.db.models.experiment import Experiment
-
 from app.core.errors import AppError
-from app.schemas.experiment import ExperimentOut, ExperimentUpdate, ExperimentComparison
+from app.schemas.experiment import ExperimentComparison, ExperimentOut, ExperimentUpdate
+from src.infra.db.models.experiment import Experiment
 
 
 def _exp_to_out(exp: Experiment) -> ExperimentOut:

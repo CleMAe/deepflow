@@ -22,7 +22,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.engine.train_worker import _build_model, _CV_ARCHS, _is_cv_arch
+from src.engine.train_worker import _build_model, _is_cv_arch
 
 logger = logging.getLogger(__name__)
 
@@ -394,7 +394,7 @@ class InferenceEngine:
         batch_size: int = 32,
     ) -> torch.utils.data.DataLoader:
         """Load a dataset for inference/evaluation. Raises FileNotFoundError if not loadable."""
-        from src.engine.train_worker import _load_tabular_dataset, _load_image_dataset
+        from src.engine.train_worker import _load_image_dataset, _load_tabular_dataset
 
         path = Path(dataset_path)
         if not path.exists():
