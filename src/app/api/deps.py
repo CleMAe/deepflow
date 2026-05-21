@@ -21,6 +21,7 @@ from app.services.cleaning_engine import PandasCleaningEngine
 from app.services.data_parser import PandasDataParser
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import PandasEdaService
+from app.services.split_service import PandasSplitService
 from app.services.storage_mock import MockFileStorage
 from shared.protocols import DataParserProtocol
 from app.services.inference_service import InferenceService
@@ -80,6 +81,14 @@ def get_augmentation_service(
     storage: StorageProtocol = Depends(get_storage),
 ) -> PillowAugmentationService:
     return PillowAugmentationService(repo, storage)
+
+
+def get_split_service(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+    storage: StorageProtocol = Depends(get_storage),
+    parser: DataParserProtocol = Depends(get_data_parser),
+) -> PandasSplitService:
+    return PandasSplitService(repo, storage, parser)
 
 
 def get_training_service(

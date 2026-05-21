@@ -111,24 +111,42 @@ class DatasetService:
         return DatasetPreviewSchema(columns=columns, rows=rows, total_rows=total_rows, limit=limit)
 
     def list_images(self, project_id: uuid.UUID, dataset_id: uuid.UUID, page: int, page_size: int) -> PaginatedImages:
-        self._require_row(project_id, dataset_id)
-        from uuid import uuid4
-
+        row = self._require_row(project_id, dataset_id)
         from app.schemas.dataset import ImageItemSchema
+        from app.services.image_gallery import (
+            image_dimensions,
+            load_labels_map,
+            stable_image_id,
+            _list_image_paths,
+        )
 
-        items = [
-            ImageItemSchema(
-                id=uuid4(),
-                filename=f"sample_{i:03d}.jpg",
-                thumbnail_path=f"/projects/{project_id}/datasets/{dataset_id}/thumbs/sample_{i:03d}.jpg",
-                labels=["cat"] if i % 2 == 0 else ["dog"],
-                width=224,
-                height=224,
+        paths = _list_image_paths(row.file_path or "")
+        total = len(paths)
+        start = (page - 1) * page_size
+        end = start + page_size
+        labels_map = load_labels_map(row.file_path or "")
+        items = []
+        for path in paths[start:end]:
+            filename = path.name
+            w, h = image_dimensions(path)
+            items.append(
+                ImageItemSchema(
+                    id=stable_image_id(project_id, dataset_id, filename),
+                    filename=filename,
+                    thumbnail_path=f"/projects/{project_id}/datasets/{dataset_id}/thumbs/{filename}",
+                    labels=labels_map.get(filename, []),
+                    width=w,
+                    height=h,
+                )
             )
-            for i in range((page - 1) * page_size + 1, (page - 1) * page_size + page_size + 1)
-        ]
-        return PaginatedImages(page=page, page_size=page_size, total=200, items=items)
+        return PaginatedImages(page=page, page_size=page_size, total=total, items=items)
 
     def update_labels(self, project_id: uuid.UUID, dataset_id: uuid.UUID, body: BatchLabelUpdate) -> dict:
-        self._require_row(project_id, dataset_id)
+        row = self._require_row(project_id, dataset_id)
+        from app.services.image_gallery import load_labels_map, save_labels_map
+
+        labels = load_labels_map(row.file_path or "")
+        for item in body.items:
+            labels[item.filename] = list(item.labels)
+        save_labels_map(row.file_path or "", labels)
         return {"updated": len(body.items)}
