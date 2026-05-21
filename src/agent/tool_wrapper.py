@@ -10,6 +10,7 @@ from src.agent.repository import AgentRepository
 from shared.protocols import ToolType
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
     from app.services.inference_service import InferenceService
 
 
@@ -18,9 +19,11 @@ class ToolWrapper:
         self,
         repo: AgentRepository,
         inference_service: InferenceService | None = None,
+        db: Session | None = None,
     ) -> None:
         self._repo = repo
         self._inference_service = inference_service
+        self._db = db
 
     def get_tools_schema(self, agent_id: uuid.UUID) -> list[dict[str, Any]]:
         """Generate OpenAI function-calling compatible tools param for all bound tools."""
@@ -84,10 +87,19 @@ class ToolWrapper:
         input_data = arguments.get("input", "")
 
         if self._inference_service and model_id:
+            if not self._db:
+                return {"error": "Database session not available for inference", "model_id": model_id}
+
+            project_id = None
+            if hasattr(tool, "agent") and tool.agent is not None:
+                project_id = tool.agent.project_id
+            else:
+                return {"error": f"Agent relationship not loaded for tool '{tool.name}', cannot determine project", "model_id": model_id}
+
             try:
                 result = self._inference_service.online_inference(
-                    db=self._repo._db,
-                    project_id=tool.agent.project_id if hasattr(tool, "agent") and tool.agent else uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                    db=self._db,
+                    project_id=project_id,
                     model_id=uuid.UUID(model_id),
                     input_data=input_data,
                 )

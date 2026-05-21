@@ -57,7 +57,7 @@ def _get_deps(
 ):
     repo = AgentRepository(db)
     service = AgentService(repo)
-    tool_wrapper = ToolWrapper(repo, inference_service=inference_svc)
+    tool_wrapper = ToolWrapper(repo, inference_service=inference_svc, db=db)
     chat_engine = ChatEngine(repo, tool_wrapper)
     prompt_manager = PromptManager(repo)
     return repo, service, chat_engine, prompt_manager, db

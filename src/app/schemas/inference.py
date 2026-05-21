@@ -66,7 +66,6 @@ class EvaluateResult(BaseModel):
 
 
 class ExportOnnxResult(BaseModel):
-    task_id: str
-    status: str
     onnx_path: str | None = None
+    status: str = "ready"
     opset_version: int = 17

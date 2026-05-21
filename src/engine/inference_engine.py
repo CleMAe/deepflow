@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import logging
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -21,8 +24,11 @@ import torch.nn as nn
 
 from src.engine.train_worker import _build_model, _CV_ARCHS, _is_cv_arch
 
-# In-memory task store for async inference tasks
+logger = logging.getLogger(__name__)
+
+# In-memory task store for async inference tasks (thread-safe via _lock)
 _tasks: dict[str, dict[str, Any]] = {}
+_lock = threading.Lock()
 
 
 class InferenceEngine:
@@ -54,7 +60,7 @@ class InferenceEngine:
         model.eval()
         return model, ckpt, dev
 
-    def _find_checkpoint(
+    def find_checkpoint(
         self,
         checkpoint_path: str | None,
         model_path: str | None,
@@ -68,14 +74,11 @@ class InferenceEngine:
 
         if model_path:
             model_dir = Path(model_path)
-            # Check for checkpoint dir
             ckpt_dir = model_dir / "checkpoint" if model_dir.name != "checkpoint" else model_dir
             if ckpt_dir.exists():
-                # Prefer best checkpoint
                 best = ckpt_dir / "checkpoint_best.pth"
                 if best.exists():
                     return str(best)
-                # Fall back to any checkpoint
                 ckpts = sorted(ckpt_dir.glob("checkpoint_*.pth"))
                 if ckpts:
                     return str(ckpts[-1])
@@ -111,14 +114,12 @@ class InferenceEngine:
             output = model(tensor)
 
             if output.shape[-1] > 1:
-                # Multi-class classification
                 probs = torch.softmax(output, dim=-1)
                 confidence, pred_idx = probs.max(dim=-1)
                 pred_label = pred_idx.item()
                 confidence_val = confidence.item()
                 prob_dict = {str(i): round(probs[0, i].item(), 6) for i in range(probs.shape[-1])}
             else:
-                # Binary or regression
                 if output.shape[-1] == 1:
                     prob = torch.sigmoid(output)
                     pred_label = (prob > 0.5).long().item()
@@ -162,46 +163,33 @@ class InferenceEngine:
     ) -> torch.Tensor:
         """Decode tabular input (dict of column→value) into a tensor."""
         if isinstance(input_data, str):
-            # Try to parse as JSON
-            import json
             input_data = json.loads(input_data)
 
         input_dim = ckpt.get("input_dim", 20)
         if isinstance(input_data, dict):
             values = [float(v) for v in input_data.values()]
-            if len(values) < input_dim:
-                values.extend([0.0] * (input_dim - len(values)))
-            values = values[:input_dim]
         elif isinstance(input_data, list):
             values = [float(v) for v in input_data]
         else:
             values = [float(input_data)] * input_dim
 
+        if len(values) != input_dim:
+            if len(values) < input_dim:
+                logger.warning(
+                    "Tabular input has %d features but model expects %d; padding with 0.0",
+                    len(values), input_dim,
+                )
+                values.extend([0.0] * (input_dim - len(values)))
+            else:
+                logger.warning(
+                    "Tabular input has %d features but model expects %d; truncating",
+                    len(values), input_dim,
+                )
+                values = values[:input_dim]
+
         return torch.tensor([values], dtype=torch.float32, device=device)
 
     # ── Batch inference (async task) ─────────────────────────────
-
-    def start_batch_inference(
-        self,
-        model_id: str,
-        checkpoint_path: str,
-        dataset_path: str,
-        arch_type: str,
-        device: str = "auto",
-    ) -> str:
-        """Start batch inference as a background task. Returns task_id."""
-        task_id = str(uuid.uuid4())
-        _tasks[task_id] = {
-            "task_id": task_id,
-            "model_id": model_id,
-            "status": "pending",
-            "progress": 0.0,
-            "predictions": [],
-            "result_path": None,
-            "created_at": time.time(),
-            "finished_at": None,
-        }
-        return task_id
 
     def run_batch_inference(
         self,
@@ -213,17 +201,15 @@ class InferenceEngine:
         device: str = "auto",
     ) -> None:
         """Execute batch inference. Called from background thread."""
-        task = _tasks.get(task_id)
-        if not task:
-            return
+        with _lock:
+            task = _tasks.get(task_id)
+            if not task:
+                return
+            task["status"] = "running"
 
-        task["status"] = "running"
         try:
             model, ckpt, dev = self._load_model(checkpoint_path, device)
             loader = self._load_dataset_for_inference(dataset_path, arch_type)
-            if loader is None:
-                task["status"] = "failed"
-                return
 
             predictions = []
             total = len(loader.dataset)
@@ -248,27 +234,29 @@ class InferenceEngine:
                         })
 
                     done += X.shape[0]
-                    task["progress"] = round(done / total, 4)
+                    with _lock:
+                        task["progress"] = round(done / total, 4)
 
-            # Save results
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             result_path = str(Path(output_dir) / f"batch_{task_id}.json")
-            import json
             with open(result_path, "w") as f:
                 json.dump(predictions, f, ensure_ascii=False)
 
-            task["status"] = "success"
-            task["progress"] = 1.0
-            task["predictions"] = predictions
-            task["result_path"] = result_path
+            with _lock:
+                task["status"] = "success"
+                task["progress"] = 1.0
+                task["predictions"] = predictions
+                task["result_path"] = result_path
 
         except Exception as e:
-            task["status"] = "failed"
-            task["predictions"] = []
-            task["result_path"] = None
-            task["error"] = str(e)
+            with _lock:
+                task["status"] = "failed"
+                task["predictions"] = []
+                task["result_path"] = None
+                task["error"] = str(e)
         finally:
-            task["finished_at"] = time.time()
+            with _lock:
+                task["finished_at"] = time.time()
 
     # ── Evaluation ───────────────────────────────────────────────
 
@@ -283,8 +271,6 @@ class InferenceEngine:
         """Evaluate model on a dataset. Returns metrics, confusion_matrix, classification_report."""
         model, ckpt, dev = self._load_model(checkpoint_path, device)
         loader = self._load_dataset_for_inference(dataset_path, arch_type)
-        if loader is None:
-            return {"metrics": {}, "confusion_matrix": [], "classification_report": {}, "num_samples": 0}
 
         all_preds = []
         all_labels = []
@@ -307,7 +293,6 @@ class InferenceEngine:
 
         result: dict[str, Any] = {"num_samples": n}
 
-        # Compute metrics
         computed: dict[str, float] = {}
         requested = metrics or ["accuracy", "f1", "precision", "recall"]
 
@@ -320,14 +305,12 @@ class InferenceEngine:
 
         result["metrics"] = computed
 
-        # Confusion matrix
         n_classes = max(int(labels_arr.max()), int(preds_arr.max())) + 1
         cm = np.zeros((n_classes, n_classes), dtype=int)
         for t, p in zip(labels_arr, preds_arr):
             cm[int(t)][int(p)] += 1
         result["confusion_matrix"] = cm.tolist()
 
-        # Classification report
         report: dict[str, dict[str, float]] = {}
         for cls in range(n_classes):
             tp = cm[cls][cls]
@@ -377,7 +360,6 @@ class InferenceEngine:
 
         arch_type = ckpt.get("arch_type", "mlp")
         is_cv = _is_cv_arch(arch_type)
-        n_classes = ckpt.get("n_classes", 3)
         input_dim = ckpt.get("input_dim", 20)
 
         if is_cv:
@@ -410,13 +392,13 @@ class InferenceEngine:
         dataset_path: str,
         arch_type: str,
         batch_size: int = 32,
-    ) -> torch.utils.data.DataLoader | None:
-        """Load a dataset for inference/evaluation. Returns None if not loadable."""
-        from src.engine.train_worker import _load_tabular_dataset, _load_image_dataset, _make_synthetic_loader, _make_synthetic_cv_loader
+    ) -> torch.utils.data.DataLoader:
+        """Load a dataset for inference/evaluation. Raises FileNotFoundError if not loadable."""
+        from src.engine.train_worker import _load_tabular_dataset, _load_image_dataset
 
         path = Path(dataset_path)
         if not path.exists():
-            return None
+            raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
         is_cv = _is_cv_arch(arch_type)
 
@@ -427,36 +409,35 @@ class InferenceEngine:
             loader = _load_tabular_dataset(dataset_path, batch_size)
             if loader is not None:
                 return loader
-            return _make_synthetic_cv_loader(n_samples=64, batch_size=batch_size)
         else:
             loader = _load_tabular_dataset(dataset_path, batch_size)
             if loader is not None:
                 return loader
-            return _make_synthetic_loader(n_samples=128, batch_size=batch_size)
+
+        raise FileNotFoundError(
+            f"Could not load dataset at {dataset_path} as {arch_type} format. "
+            "Ensure the dataset format matches the model architecture."
+        )
 
     # ── Task management ──────────────────────────────────────────
 
     @staticmethod
     def get_task(task_id: str) -> dict[str, Any] | None:
-        return _tasks.get(task_id)
+        with _lock:
+            return _tasks.get(task_id)
 
     @staticmethod
     def create_task(model_id: str) -> str:
         task_id = str(uuid.uuid4())
-        _tasks[task_id] = {
-            "task_id": task_id,
-            "model_id": model_id,
-            "status": "pending",
-            "progress": 0.0,
-            "predictions": [],
-            "result_path": None,
-            "created_at": time.time(),
-            "finished_at": None,
-        }
+        with _lock:
+            _tasks[task_id] = {
+                "task_id": task_id,
+                "model_id": model_id,
+                "status": "pending",
+                "progress": 0.0,
+                "predictions": [],
+                "result_path": None,
+                "created_at": time.time(),
+                "finished_at": None,
+            }
         return task_id
-
-    @staticmethod
-    def update_task(task_id: str, **kwargs: Any) -> None:
-        task = _tasks.get(task_id)
-        if task:
-            task.update(kwargs)

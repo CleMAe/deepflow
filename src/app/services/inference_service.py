@@ -8,10 +8,12 @@ to InferenceEngine for actual PyTorch inference, manages async tasks.
 from __future__ import annotations
 
 import threading
-import time
 import uuid
+from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.engine.inference_engine import InferenceEngine
@@ -36,7 +38,12 @@ from app.schemas.inference import (
     PredictionItem,
 )
 
-_engine = InferenceEngine()
+_VALID_OUTPUT_FORMATS = {"json", "csv"}
+
+
+@lru_cache(maxsize=1)
+def _get_engine() -> InferenceEngine:
+    return InferenceEngine()
 
 
 class InferenceService:
@@ -63,28 +70,25 @@ class InferenceService:
         checkpoint_path: str | None,
     ) -> str:
         """Resolve checkpoint path: explicit > best from training job > model_path."""
+        engine = _get_engine()
+
         if checkpoint_path:
             return checkpoint_path
 
-        # Find the latest successful/completed training job for this model
-        from sqlalchemy import select
-        jobs = db.scalars(
+        job = db.scalars(
             select(TrainingJob)
             .where(
                 TrainingJob.model_id == model.id,
-                TrainingJob.status.in_([TrainingJobStatus.SUCCESS, TrainingJobStatus.FAILED]),
+                TrainingJob.status == TrainingJobStatus.SUCCESS,
             )
             .order_by(TrainingJob.finished_at.desc())
             .limit(1)
         ).first()
 
-        if jobs and jobs.checkpoint:
-            return jobs.checkpoint
+        if job and job.checkpoint:
+            return job.checkpoint
 
-        # Try model's stored path
-        resolved = _engine._find_checkpoint(
-            checkpoint_path, model.model_path
-        )
+        resolved = engine.find_checkpoint(checkpoint_path, model.model_path)
         if resolved:
             return resolved
 
@@ -109,11 +113,12 @@ class InferenceService:
         input_data: dict[str, Any] | str,
         checkpoint_path: str | None = None,
     ) -> OnlineInferenceResult:
+        engine = _get_engine()
         model = self._get_model(db, project_id, model_id)
         ckpt_path = self._resolve_checkpoint(db, project_id, model, checkpoint_path)
 
         try:
-            result = _engine.online_inference(ckpt_path, input_data)
+            result = engine.online_inference(ckpt_path, input_data)
         except FileNotFoundError as e:
             raise AppError.not_found(str(e), code=ERR_INFERENCE_CHECKPOINT_NOT_FOUND)
         except Exception as e:
@@ -137,13 +142,14 @@ class InferenceService:
         checkpoint_path: str | None = None,
         metrics: list[str] | None = None,
     ) -> EvaluateResult:
+        engine = _get_engine()
         model = self._get_model(db, project_id, model_id)
         ds = self._get_dataset(db, project_id, dataset_id)
         ckpt_path = self._resolve_checkpoint(db, project_id, model, checkpoint_path)
         ds_path = self._resolve_dataset_path(ds, project_id)
 
         try:
-            result = _engine.evaluate(ckpt_path, ds_path, model.arch_type, metrics)
+            result = engine.evaluate(ckpt_path, ds_path, model.arch_type, metrics)
         except FileNotFoundError as e:
             raise AppError.not_found(str(e), code=ERR_INFERENCE_CHECKPOINT_NOT_FOUND)
         except Exception as e:
@@ -169,18 +175,25 @@ class InferenceService:
         checkpoint_path: str | None = None,
         output_format: str = "json",
     ) -> InferenceTaskResponse:
+        if output_format not in _VALID_OUTPUT_FORMATS:
+            from app.core.errors import ERR_INFERENCE_INVALID_PARAM
+            raise AppError.bad_request(
+                f"Unsupported output_format '{output_format}'. Must be one of {sorted(_VALID_OUTPUT_FORMATS)}.",
+                code=ERR_INFERENCE_INVALID_PARAM,
+            )
+
+        engine = _get_engine()
         model = self._get_model(db, project_id, model_id)
         ds = self._get_dataset(db, project_id, dataset_id)
         ckpt_path = self._resolve_checkpoint(db, project_id, model, checkpoint_path)
         ds_path = self._resolve_dataset_path(ds, project_id)
 
-        task_id = _engine.create_task(str(model_id))
+        task_id = engine.create_task(str(model_id))
 
         output_dir = self._storage.get_exported_path(str(project_id), str(model_id))
 
-        # Run in background thread
         thread = threading.Thread(
-            target=_engine.run_batch_inference,
+            target=engine.run_batch_inference,
             kwargs={
                 "task_id": task_id,
                 "checkpoint_path": ckpt_path,
@@ -192,7 +205,7 @@ class InferenceService:
         )
         thread.start()
 
-        task = _engine.get_task(task_id)
+        task = engine.get_task(task_id)
         return self._task_to_response(task)
 
     # ── Get inference task ───────────────────────────────────────
@@ -203,7 +216,8 @@ class InferenceService:
         project_id: uuid.UUID,
         task_id: str,
     ) -> InferenceTaskResponse:
-        task = _engine.get_task(task_id)
+        engine = _get_engine()
+        task = engine.get_task(task_id)
         if not task:
             raise AppError.not_found("Inference task not found", code=ERR_INFERENCE_TASK_NOT_FOUND)
         return self._task_to_response(task)
@@ -219,14 +233,16 @@ class InferenceService:
         opset_version: int = 17,
         dynamic_batch: bool = True,
     ) -> ExportOnnxResult:
+        engine = _get_engine()
         model = self._get_model(db, project_id, model_id)
         ckpt_path = self._resolve_checkpoint(db, project_id, model, checkpoint_path)
 
         output_dir = self._storage.get_exported_path(str(project_id), str(model_id))
-        onnx_path = f"{output_dir}/model.onnx"
+        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
+        onnx_path = f"{output_dir}/model_{ts}.onnx"
 
         try:
-            _engine.export_onnx(
+            engine.export_onnx(
                 checkpoint_path=ckpt_path,
                 output_path=onnx_path,
                 opset_version=opset_version,
@@ -237,15 +253,13 @@ class InferenceService:
         except Exception as e:
             raise AppError.internal(f"ONNX export failed: {e}", code=ERR_INFERENCE_EXPORT_FAILED)
 
-        # Update model_path to point to the exported ONNX if no path set
         if not model.model_path:
             model.model_path = onnx_path
             db.commit()
 
         return ExportOnnxResult(
-            task_id=str(uuid.uuid4()),
-            status="completed",
             onnx_path=onnx_path,
+            status="ready",
             opset_version=opset_version,
         )
 
@@ -261,12 +275,10 @@ class InferenceService:
 
         created_at = None
         if task.get("created_at"):
-            from datetime import datetime, timezone
             created_at = datetime.fromtimestamp(task["created_at"], tz=timezone.utc).isoformat()
 
         finished_at = None
         if task.get("finished_at"):
-            from datetime import datetime, timezone
             finished_at = datetime.fromtimestamp(task["finished_at"], tz=timezone.utc).isoformat()
 
         return InferenceTaskResponse(
