@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from shared.protocols import ToolType
 from src.infra.db.base import Base, TimestampUpdateMixin, UUIDPrimaryKeyMixin
 from src.infra.db.types import JSONType
-from shared.protocols import ToolType
 
 if TYPE_CHECKING:
     from src.infra.db.models.agent import Agent

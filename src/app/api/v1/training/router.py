@@ -7,11 +7,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_storage, get_training_service, require_project_access
+from app.api.deps import get_db, get_training_service, require_project_access
 from app.core.response import success
 from app.schemas.training import TrainingJobCreate
 from app.services.training_service import TrainingService
-from shared.protocols import StorageProtocol
 
 router = APIRouter(prefix="/projects/{project_id}/training-jobs", tags=["Training"])
 

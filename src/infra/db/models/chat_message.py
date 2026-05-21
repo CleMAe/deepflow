@@ -4,7 +4,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Enum, ForeignKey, Text, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.protocols import ChatRole
 from src.infra.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin

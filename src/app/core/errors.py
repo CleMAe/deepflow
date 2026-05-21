@@ -48,6 +48,11 @@ ERR_TRAINING_INVALID_TRANSITION = error_code(50, 1, 1)
 # ── Inference (60) ───────────────────────────────────────────
 ERR_INFERENCE_TASK_NOT_FOUND = error_code(60, 2, 1)
 ERR_INFERENCE_INVALID_PARAM = error_code(60, 1, 1)
+ERR_INFERENCE_MODEL_NOT_FOUND = error_code(60, 2, 2)
+ERR_INFERENCE_CHECKPOINT_NOT_FOUND = error_code(60, 2, 3)
+ERR_INFERENCE_DATASET_NOT_FOUND = error_code(60, 2, 4)
+ERR_INFERENCE_MODEL_LOAD_FAILED = error_code(60, 5, 1)
+ERR_INFERENCE_EXPORT_FAILED = error_code(60, 5, 2)
 
 # ── Agent (70) ───────────────────────────────────────────────
 ERR_AGENT_NOT_FOUND = error_code(70, 2, 1)

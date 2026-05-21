@@ -7,6 +7,9 @@ type Agent = components['schemas']['Agent']
 type AgentCreate = components['schemas']['AgentCreate']
 type AgentTool = components['schemas']['AgentTool']
 type AgentUpdate = components['schemas']['AgentUpdate']
+type ChatRequest = components['schemas']['ChatRequest']
+type PromptTemplate = components['schemas']['PromptTemplate']
+type PromptTemplateCreate = components['schemas']['PromptTemplateCreate']
 type ToolBindRequest = components['schemas']['ToolBindRequest']
 
 const now = '2026-05-19T09:00:00Z'
@@ -37,6 +40,19 @@ const mockAgents: Agent[] = [
       },
     ],
     status: 'active',
+    created_at: now,
+    updated_at: now,
+  },
+]
+
+const mockPromptTemplates: PromptTemplate[] = [
+  {
+    id: 'prompt-1',
+    agent_id: 'agent-1',
+    name: '质检分析模板',
+    template: '请结合模型推理结果、置信度和异常类别，为业务同学生成一段可执行的质检建议。',
+    description: '用于商品图像分类后的结果解释',
+    variables: ['prediction', 'confidence'],
     created_at: now,
     updated_at: now,
   },
@@ -166,5 +182,106 @@ export const agentHandlers = [
     agent.updated_at = new Date().toISOString()
 
     return HttpResponse.json(buildResponse(tool, 'mock-p5-agent-tool-bind'))
+  }),
+
+  http.post('/api/v1/projects/:projectId/agents/:agentId/chat', async ({ request, params }) => {
+    const payload = (await request.json()) as ChatRequest
+    const encoder = new TextEncoder()
+    const agent = findAgent(String(params.projectId), String(params.agentId))
+    const toolName = agent?.tools?.[0]?.name ?? 'model_predict'
+    const events = [
+      { type: 'token', content: '已收到你的问题。' },
+      { type: 'tool_call', name: toolName, args: { input: payload.message, top_k: 3 } },
+      {
+        type: 'tool_result',
+        name: toolName,
+        result: {
+          prediction: '轻微异常',
+          confidence: 0.873,
+          latency_ms: 42,
+        },
+      },
+      { type: 'token', content: '模型工具返回轻微异常，置信度 87.3%。' },
+      { type: 'token', content: '建议优先复核图片清晰度、商品边缘遮挡和标签一致性。' },
+      { type: 'done', message_id: `msg-${Date.now()}` },
+    ]
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        for (const event of events) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+          await new Promise((resolve) => window.setTimeout(resolve, 120))
+        }
+        controller.close()
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      },
+    })
+  }),
+
+  http.get('/api/v1/projects/:projectId/agents/:agentId/chat/history', ({ params }) => {
+    const conversationId = 'conversation-mock-1'
+    return HttpResponse.json(
+      buildResponse(
+        {
+          page: 1,
+          page_size: 50,
+          total: 2,
+          items: [
+            {
+              id: 'message-1',
+              conversation_id: conversationId,
+              role: 'user',
+              content: '请分析最近一次批量推理结果。',
+              created_at: now,
+            },
+            {
+              id: 'message-2',
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: `Agent ${params.agentId} 已完成一次模型工具调用，并给出轻微异常复核建议。`,
+              tool_calls: [
+                {
+                  name: 'model_predict',
+                  arguments: { sample: 'item_0002.jpg' },
+                  result: { prediction: '轻微异常', confidence: 0.873 },
+                },
+              ],
+              created_at: now,
+            },
+          ],
+        },
+        'mock-p5-agent-history'
+      )
+    )
+  }),
+
+  http.get('/api/v1/projects/:projectId/agents/:agentId/prompts', ({ params }) => {
+    const items = mockPromptTemplates.filter((template) => template.agent_id === params.agentId)
+    return HttpResponse.json(buildResponse(items, 'mock-p5-agent-prompts'))
+  }),
+
+  http.post('/api/v1/projects/:projectId/agents/:agentId/prompts', async ({ request, params }) => {
+    const payload = (await request.json()) as PromptTemplateCreate
+    const timestamp = new Date().toISOString()
+    const template: PromptTemplate = {
+      id: `prompt-${Date.now()}`,
+      agent_id: String(params.agentId),
+      name: payload.name,
+      template: payload.template,
+      description: payload.description,
+      variables: payload.variables,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }
+
+    mockPromptTemplates.unshift(template)
+
+    return HttpResponse.json(buildResponse(template, 'mock-p5-agent-prompt-save'), { status: 201 })
   }),
 ]

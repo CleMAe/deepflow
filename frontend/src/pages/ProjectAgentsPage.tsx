@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import {
@@ -11,33 +11,54 @@ import {
   Form,
   Input,
   InputNumber,
+  List,
   Modal,
   Popconfirm,
   Row,
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
   message,
 } from 'antd'
-import { DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
 import {
   bindAgentTools,
   createAgent,
   deleteAgent,
   listAgentTools,
   listAgents,
+  listPromptTemplates,
+  savePromptTemplate,
+  streamAgentChat,
   type Agent,
   type AgentCreate,
+  type AgentStreamEvent,
   type AgentTool,
+  type PromptTemplate,
+  type PromptTemplateCreate,
 } from '@/api/agents'
 import { listInferenceModels, type Model } from '@/api/inference'
 
-const { Text } = Typography
+const { Paragraph, Text } = Typography
+const MAX_TOOL_EVENTS = 40
 
 type AgentModelConfig = NonNullable<AgentCreate['model_config']>
 type AgentProvider = AgentModelConfig['provider']
+type ChatRole = 'user' | 'assistant'
+type ToolTimelineItem = {
+  id: string
+  type: 'tool_call' | 'tool_result' | 'error'
+  name?: string
+  detail?: unknown
+}
+type LocalChatMessage = {
+  id: string
+  role: ChatRole
+  content: string
+}
 
 interface CreateAgentFormValues {
   name: string
@@ -55,11 +76,25 @@ interface BindToolFormValues {
   description?: string
 }
 
+interface PromptFormValues {
+  name: string
+  description?: string
+  template: string
+  variables?: string
+}
+
 function formatDate(value?: string) {
   if (!value) {
     return '-'
   }
   return new Date(value).toLocaleString()
+}
+
+function stringifyValue(value: unknown) {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return JSON.stringify(value)
 }
 
 function modelLabel(model: Model) {
@@ -68,6 +103,21 @@ function modelLabel(model: Model) {
 
 function agentStatusColor(status?: Agent['status']) {
   return status === 'active' ? 'green' : 'default'
+}
+
+function getAgentModelName(agent?: Agent) {
+  const config = agent?.model_config ?? {}
+  return String(config.model ?? 'mock')
+}
+
+function getEventText(event: AgentStreamEvent) {
+  return event.content ?? event.text ?? ''
+}
+
+function appendLatestAssistantMessage(messages: LocalChatMessage[], text: string) {
+  return messages.map((item, index) =>
+    index === messages.length - 1 && item.role === 'assistant' ? { ...item, content: `${item.content}${text}` } : item
+  )
 }
 
 function renderToolTags(tools?: AgentTool[]) {
@@ -86,15 +136,104 @@ function renderToolTags(tools?: AgentTool[]) {
   )
 }
 
+function ToolTimeline({ items }: { items: ToolTimelineItem[] }) {
+  if (!items.length) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无工具事件" />
+  }
+
+  return (
+    <List
+      size="small"
+      dataSource={items}
+      renderItem={(item) => (
+        <List.Item>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            <Space>
+              <Tag color={item.type === 'tool_call' ? 'blue' : item.type === 'tool_result' ? 'green' : 'red'}>
+                {item.type === 'tool_call' ? '工具调用' : item.type === 'tool_result' ? '工具结果' : '错误'}
+              </Tag>
+              <Text strong>{item.name ?? 'agent'}</Text>
+            </Space>
+            <Text code style={{ whiteSpace: 'normal' }}>
+              {stringifyValue(item.detail)}
+            </Text>
+          </Space>
+        </List.Item>
+      )}
+    />
+  )
+}
+
+function ChatMessages({ messages }: { messages: LocalChatMessage[] }) {
+  if (!messages.length) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无对话消息" />
+  }
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      {messages.map((item) => (
+        <div
+          key={item.id}
+          style={{
+            display: 'flex',
+            justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '78%',
+              padding: '10px 12px',
+              borderRadius: 8,
+              background: item.role === 'user' ? '#e6f4ff' : '#f6ffed',
+              border: `1px solid ${item.role === 'user' ? '#91caff' : '#b7eb8f'}`,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            <Text strong>{item.role === 'user' ? '用户' : 'Agent'}</Text>
+            <div style={{ marginTop: 6 }}>{item.content || '...'}</div>
+          </div>
+        </div>
+      ))}
+    </Space>
+  )
+}
+
 export default function ProjectAgentsPage() {
   const { projectId } = useParams()
   const queryClient = useQueryClient()
   const [messageApi, contextHolder] = message.useMessage()
   const [createOpen, setCreateOpen] = useState(false)
   const [bindOpen, setBindOpen] = useState(false)
-  const [selectedAgent, setSelectedAgent] = useState<Agent>()
+  const [selectedAgentId, setSelectedAgentId] = useState<string>()
+  const [selectedToolAgent, setSelectedToolAgent] = useState<Agent>()
+  const [chatInput, setChatInput] = useState('请结合已绑定模型工具，分析最近一次批量推理中的异常样本。')
+  const [chatMessages, setChatMessages] = useState<LocalChatMessage[]>([])
+  const [toolEvents, setToolEvents] = useState<ToolTimelineItem[]>([])
+  const [streaming, setStreaming] = useState(false)
+  const streamAbortRef = useRef<AbortController>()
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const tokenBufferRef = useRef('')
+  const flushTimerRef = useRef<number>()
   const [createForm] = Form.useForm<CreateAgentFormValues>()
   const [bindForm] = Form.useForm<BindToolFormValues>()
+  const [promptForm] = Form.useForm<PromptFormValues>()
+
+  useEffect(() => {
+    const container = chatScrollRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [chatMessages])
+
+  useEffect(
+    () => () => {
+      streamAbortRef.current?.abort()
+      if (flushTimerRef.current) {
+        window.clearTimeout(flushTimerRef.current)
+      }
+    },
+    []
+  )
 
   const agentsQuery = useQuery({
     queryKey: ['p5-agents', projectId],
@@ -108,14 +247,24 @@ export default function ProjectAgentsPage() {
     enabled: !!projectId,
   })
 
+  const agents = useMemo(() => agentsQuery.data?.items ?? [], [agentsQuery.data?.items])
+  const selectedAgent = useMemo(
+    () => agents.find((agent) => agent.id === selectedAgentId) ?? agents[0],
+    [agents, selectedAgentId]
+  )
+  const boundToolCount = agents.reduce((total, agent) => total + (agent.tools?.length ?? 0), 0)
+
   const toolsQuery = useQuery({
-    queryKey: ['p5-agent-tools', projectId, selectedAgent?.id],
-    queryFn: () => listAgentTools(projectId!, selectedAgent!.id!),
-    enabled: !!projectId && !!selectedAgent?.id && bindOpen,
+    queryKey: ['p5-agent-tools', projectId, selectedToolAgent?.id],
+    queryFn: () => listAgentTools(projectId!, selectedToolAgent!.id!),
+    enabled: !!projectId && !!selectedToolAgent?.id && bindOpen,
   })
 
-  const agents = agentsQuery.data?.items ?? []
-  const boundToolCount = agents.reduce((total, agent) => total + (agent.tools?.length ?? 0), 0)
+  const promptsQuery = useQuery({
+    queryKey: ['p5-agent-prompts', projectId, selectedAgent?.id],
+    queryFn: () => listPromptTemplates(projectId!, selectedAgent!.id!),
+    enabled: !!projectId && !!selectedAgent?.id,
+  })
 
   const modelOptions = useMemo(
     () =>
@@ -124,6 +273,15 @@ export default function ProjectAgentsPage() {
         value: model.id,
       })),
     [modelsQuery.data?.items]
+  )
+
+  const agentOptions = useMemo(
+    () =>
+      agents.map((agent) => ({
+        label: agent.name ?? agent.id,
+        value: agent.id,
+      })),
+    [agents]
   )
 
   const createMutation = useMutation({
@@ -139,8 +297,11 @@ export default function ProjectAgentsPage() {
           max_tokens: values.max_tokens,
         },
       }),
-    onSuccess: () => {
+    onSuccess: (agent) => {
       queryClient.invalidateQueries({ queryKey: ['p5-agents', projectId] })
+      if (agent.id) {
+        setSelectedAgentId(agent.id)
+      }
       setCreateOpen(false)
       createForm.resetFields()
       messageApi.success('Agent 创建成功')
@@ -163,10 +324,10 @@ export default function ProjectAgentsPage() {
 
   const bindMutation = useMutation({
     mutationFn: (values: BindToolFormValues) => {
-      if (!selectedAgent?.id) {
+      if (!selectedToolAgent?.id) {
         return Promise.reject(new Error('missing agent'))
       }
-      return bindAgentTools(projectId!, selectedAgent.id, {
+      return bindAgentTools(projectId!, selectedToolAgent.id, {
         tools: [
           {
             name: values.name,
@@ -179,7 +340,7 @@ export default function ProjectAgentsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['p5-agents', projectId] })
-      queryClient.invalidateQueries({ queryKey: ['p5-agent-tools', projectId, selectedAgent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['p5-agent-tools', projectId, selectedToolAgent?.id] })
       bindForm.resetFields()
       setBindOpen(false)
       messageApi.success('工具绑定成功')
@@ -189,21 +350,187 @@ export default function ProjectAgentsPage() {
     },
   })
 
-  const openCreateModal = () => {
+  const promptMutation = useMutation({
+    mutationFn: (values: PromptFormValues) => {
+      if (!selectedAgent?.id) {
+        return Promise.reject(new Error('missing agent'))
+      }
+      const payload: PromptTemplateCreate = {
+        name: values.name,
+        description: values.description,
+        template: values.template,
+        variables: values.variables
+          ?.split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      }
+      return savePromptTemplate(projectId!, selectedAgent.id, payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['p5-agent-prompts', projectId, selectedAgent?.id] })
+      promptForm.resetFields()
+      messageApi.success('Prompt 模板已保存')
+    },
+    onError: () => {
+      messageApi.error('Prompt 模板保存失败')
+    },
+  })
+
+  const openCreateModal = useCallback(() => {
     createForm.resetFields()
     setCreateOpen(true)
-  }
+  }, [createForm])
 
-  const openBindModal = (agent: Agent) => {
-    setSelectedAgent(agent)
+  const openBindModal = useCallback(
+    (agent: Agent) => {
+    setSelectedToolAgent(agent)
     bindForm.setFieldsValue({
       name: 'model_predict',
       description: '调用已训练模型执行推理',
     })
     setBindOpen(true)
-  }
+    },
+    [bindForm]
+  )
 
-  const columns = [
+  const flushAssistantBuffer = useCallback(() => {
+    if (!tokenBufferRef.current) {
+      return
+    }
+    const text = tokenBufferRef.current
+    tokenBufferRef.current = ''
+    if (flushTimerRef.current) {
+      window.clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = undefined
+    }
+    setChatMessages((items) => appendLatestAssistantMessage(items, text))
+  }, [])
+
+  const appendAssistantText = useCallback(
+    (text: string) => {
+      if (!text) {
+        return
+      }
+      tokenBufferRef.current += text
+      if (!flushTimerRef.current) {
+        flushTimerRef.current = window.setTimeout(flushAssistantBuffer, 48)
+      }
+    },
+    [flushAssistantBuffer]
+  )
+
+  const pushToolEvent = useCallback((item: Omit<ToolTimelineItem, 'id'>) => {
+    setToolEvents((items) => [
+      ...items.slice(-(MAX_TOOL_EVENTS - 1)),
+      {
+        ...item,
+        id: `${item.type}-${Date.now()}-${items.length}`,
+      },
+    ])
+  }, [])
+
+  const handleStreamEvent = useCallback(
+    (event: AgentStreamEvent) => {
+    if (event.type === 'token' || event.type === 'content') {
+      appendAssistantText(getEventText(event))
+      return
+    }
+
+    if (event.type === 'tool_call') {
+      flushAssistantBuffer()
+      pushToolEvent({
+          type: 'tool_call',
+          name: event.name ?? event.tool,
+          detail: event.args,
+      })
+      return
+    }
+
+    if (event.type === 'tool_result') {
+      flushAssistantBuffer()
+      pushToolEvent({
+          type: 'tool_result',
+          name: event.name ?? event.tool,
+          detail: event.result,
+      })
+      return
+    }
+
+    if (event.type === 'error') {
+      flushAssistantBuffer()
+      pushToolEvent({
+          type: 'error',
+          name: 'agent',
+          detail: getEventText(event) || event.result,
+      })
+    }
+    },
+    [appendAssistantText, flushAssistantBuffer, pushToolEvent]
+  )
+
+  const sendChatMessage = useCallback(async () => {
+    if (!projectId || !selectedAgent?.id || !chatInput.trim()) {
+      messageApi.warning('请选择 Agent 并输入消息')
+      return
+    }
+
+    flushAssistantBuffer()
+    const content = chatInput.trim()
+    const assistantId = `assistant-${Date.now()}`
+    const controller = new AbortController()
+    streamAbortRef.current = controller
+    setStreaming(true)
+    setChatInput('')
+    setChatMessages((items) => [
+      ...items,
+      { id: `user-${Date.now()}`, role: 'user', content },
+      { id: assistantId, role: 'assistant', content: '' },
+    ])
+
+    try {
+      await streamAgentChat(
+        projectId,
+        selectedAgent.id,
+        {
+          message: content,
+          stream: true,
+        },
+        {
+          signal: controller.signal,
+          onEvent: (event) => {
+            handleStreamEvent(event)
+          },
+        }
+      )
+      flushAssistantBuffer()
+      messageApi.success('Agent 回复完成')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        flushAssistantBuffer()
+        messageApi.info('已停止生成')
+      } else {
+        flushAssistantBuffer()
+        setChatMessages((items) => appendLatestAssistantMessage(items, '\n[对话请求失败，请稍后重试]'))
+        messageApi.error('Agent 对话失败')
+      }
+    } finally {
+      setStreaming(false)
+      streamAbortRef.current = undefined
+    }
+  }, [chatInput, flushAssistantBuffer, handleStreamEvent, messageApi, projectId, selectedAgent])
+
+  const stopStreaming = useCallback(() => {
+    streamAbortRef.current?.abort()
+  }, [])
+
+  const clearChat = useCallback(() => {
+    flushAssistantBuffer()
+    setChatMessages([])
+    setToolEvents([])
+  }, [flushAssistantBuffer])
+
+  const columns = useMemo(
+    () => [
     {
       title: 'Agent',
       key: 'agent',
@@ -224,10 +551,7 @@ export default function ProjectAgentsPage() {
     {
       title: '模型配置',
       key: 'model_config',
-      render: (_value: unknown, agent: Agent) => {
-        const config = agent.model_config ?? {}
-        return <Text>{String(config.model ?? 'mock')}</Text>
-      },
+      render: (_value: unknown, agent: Agent) => <Text>{getAgentModelName(agent)}</Text>,
     },
     {
       title: '工具',
@@ -245,9 +569,12 @@ export default function ProjectAgentsPage() {
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 220,
       render: (_value: unknown, agent: Agent) => (
         <Space>
+          <Button size="small" icon={<SendOutlined />} onClick={() => setSelectedAgentId(agent.id)}>
+            对话
+          </Button>
           <Button size="small" icon={<LinkOutlined />} onClick={() => openBindModal(agent)}>
             绑定
           </Button>
@@ -263,13 +590,230 @@ export default function ProjectAgentsPage() {
         </Space>
       ),
     },
-  ]
+    ],
+    [deleteMutation, openBindModal]
+  )
+
+  const managementPanel = useMemo(
+    () => (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} xl={17}>
+        <Card title="Agent 列表">
+          <Table
+            rowKey={(agent) => agent.id ?? agent.name ?? 'agent'}
+            columns={columns}
+            dataSource={agents}
+            loading={agentsQuery.isLoading}
+            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 Agent" /> }}
+          />
+        </Card>
+      </Col>
+      <Col xs={24} xl={7}>
+        <Card title="运行概览">
+          <Descriptions column={1} size="small">
+            <Descriptions.Item label="Agent 数量">{agents.length}</Descriptions.Item>
+            <Descriptions.Item label="绑定工具">{boundToolCount}</Descriptions.Item>
+            <Descriptions.Item label="当前 Agent">{selectedAgent?.name ?? '-'}</Descriptions.Item>
+            <Descriptions.Item label="LLM 模型">{getAgentModelName(selectedAgent)}</Descriptions.Item>
+          </Descriptions>
+        </Card>
+      </Col>
+    </Row>
+    ),
+    [agents, agentsQuery.isLoading, boundToolCount, columns, selectedAgent]
+  )
+
+  const chatPanel = useMemo(
+    () => (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} xl={7}>
+        <Card title="对话配置">
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="选择 Agent"
+              value={selectedAgent?.id}
+              options={agentOptions}
+              loading={agentsQuery.isLoading}
+              onChange={setSelectedAgentId}
+            />
+            <Descriptions bordered size="small" column={1}>
+              <Descriptions.Item label="状态">
+                <Tag color={agentStatusColor(selectedAgent?.status)}>{selectedAgent?.status ?? '-'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="模型">{getAgentModelName(selectedAgent)}</Descriptions.Item>
+              <Descriptions.Item label="工具">{renderToolTags(selectedAgent?.tools)}</Descriptions.Item>
+            </Descriptions>
+          </Space>
+        </Card>
+        <Card title="工具调用" style={{ marginTop: 16 }}>
+          <ToolTimeline items={toolEvents} />
+        </Card>
+      </Col>
+      <Col xs={24} xl={17}>
+        <Card
+          title="Agent 对话"
+          extra={
+            streaming ? (
+              <Tag color="processing">流式响应中</Tag>
+            ) : (
+              <Tag color={selectedAgent ? 'green' : 'default'}>{selectedAgent ? '就绪' : '未选择 Agent'}</Tag>
+            )
+          }
+        >
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <div
+              ref={chatScrollRef}
+              style={{
+                minHeight: 360,
+                maxHeight: 520,
+                overflow: 'auto',
+                padding: '4px 8px 4px 0',
+                scrollBehavior: 'smooth',
+              }}
+            >
+              <ChatMessages messages={chatMessages} />
+            </div>
+            <Input.TextArea
+              rows={4}
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="输入要交给 Agent 分析的问题"
+              disabled={streaming}
+            />
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Button onClick={clearChat} disabled={streaming || (chatMessages.length === 0 && toolEvents.length === 0)}>
+                清空对话
+              </Button>
+              <Space>
+                <Button icon={<StopOutlined />} onClick={stopStreaming} disabled={!streaming}>
+                  停止
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  loading={streaming}
+                  onClick={sendChatMessage}
+                  disabled={!selectedAgent || !chatInput.trim()}
+                >
+                  发送
+                </Button>
+              </Space>
+            </Space>
+          </Space>
+        </Card>
+      </Col>
+    </Row>
+    ),
+    [
+      agentOptions,
+      agentsQuery.isLoading,
+      chatInput,
+      chatMessages,
+      clearChat,
+      selectedAgent,
+      sendChatMessage,
+      stopStreaming,
+      streaming,
+      toolEvents,
+    ]
+  )
+
+  const promptPanel = useMemo(
+    () => (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} xl={10}>
+        <Card title="保存 Prompt 模板">
+          <Form<PromptFormValues>
+            form={promptForm}
+            layout="vertical"
+            initialValues={{
+              name: '模型结果解释模板',
+              template: '请基于 $prediction 和 $confidence 生成面向业务人员的解释。',
+              variables: 'prediction, confidence',
+            }}
+            onFinish={(values) => promptMutation.mutate(values)}
+          >
+            <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入模板名称' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="description" label="描述">
+              <Input />
+            </Form.Item>
+            <Form.Item name="variables" label="变量">
+              <Input placeholder="prediction, confidence" />
+            </Form.Item>
+            <Form.Item name="template" label="模板内容" rules={[{ required: true, message: '请输入模板内容' }]}>
+              <Input.TextArea rows={8} />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={promptMutation.isPending} disabled={!selectedAgent}>
+              保存模板
+            </Button>
+          </Form>
+        </Card>
+      </Col>
+      <Col xs={24} xl={14}>
+        <Card title="Prompt 模板列表">
+          <List
+            loading={promptsQuery.isLoading}
+            dataSource={promptsQuery.data ?? []}
+            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 Prompt 模板" /> }}
+            renderItem={(item: PromptTemplate) => (
+              <List.Item>
+                <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                  <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text strong>{item.name}</Text>
+                    <Text type="secondary">{formatDate(item.updated_at ?? item.created_at)}</Text>
+                  </Space>
+                  <Text type="secondary">{item.description || '暂无描述'}</Text>
+                  <Paragraph code style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+                    {item.template}
+                  </Paragraph>
+                  <Space size={[0, 8]} wrap>
+                    {(item.variables ?? []).map((variable) => (
+                      <Tag key={variable}>{variable}</Tag>
+                    ))}
+                  </Space>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </Card>
+      </Col>
+    </Row>
+    ),
+    [promptForm, promptMutation, promptsQuery.data, promptsQuery.isLoading, selectedAgent]
+  )
+
+  const tabItems = useMemo(
+    () => [
+      {
+        key: 'manage',
+        label: '管理',
+        children: managementPanel,
+      },
+      {
+        key: 'chat',
+        label: '对话',
+        children: chatPanel,
+      },
+      {
+        key: 'prompts',
+        label: 'Prompt 模板',
+        children: promptPanel,
+      },
+    ],
+    [chatPanel, managementPanel, promptPanel]
+  )
 
   return (
     <div>
       {contextHolder}
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 24 }} align="center">
-        <h2 style={{ margin: 0 }}>Agent 管理</h2>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 20 }} align="start">
+        <Space direction="vertical" size={4}>
+          <h2 style={{ margin: 0 }}>Agent 工作区</h2>
+          <Text type="secondary">管理 Agent、绑定推理工具，并用流式对话验证业务解释能力。</Text>
+        </Space>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => agentsQuery.refetch()} loading={agentsQuery.isFetching}>
             刷新
@@ -282,28 +826,9 @@ export default function ProjectAgentsPage() {
 
       {!projectId && <Alert type="warning" showIcon message="未选择项目" style={{ marginBottom: 16 }} />}
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={17}>
-          <Card title="Agent 列表">
-            <Table
-              rowKey={(agent) => agent.id ?? agent.name ?? 'agent'}
-              columns={columns}
-              dataSource={agents}
-              loading={agentsQuery.isLoading}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 Agent" /> }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={7}>
-          <Card title="运行概览">
-            <Descriptions column={1} size="small">
-              <Descriptions.Item label="Agent 数量">{agents.length}</Descriptions.Item>
-              <Descriptions.Item label="绑定工具">{boundToolCount}</Descriptions.Item>
-              <Descriptions.Item label="模型来源">MSW Mock</Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </Col>
-      </Row>
+      <Tabs
+        items={tabItems}
+      />
 
       <Modal
         title="创建 Agent"
@@ -368,7 +893,7 @@ export default function ProjectAgentsPage() {
       </Modal>
 
       <Modal
-        title={selectedAgent?.name ? `绑定工具 - ${selectedAgent.name}` : '绑定工具'}
+        title={selectedToolAgent?.name ? `绑定工具 - ${selectedToolAgent.name}` : '绑定工具'}
         open={bindOpen}
         onCancel={() => setBindOpen(false)}
         onOk={() => bindForm.submit()}
