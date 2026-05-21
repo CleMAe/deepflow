@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from uuid import UUID
 
-from app.api.deps import require_project_access, get_inference_service
+from app.api.deps import get_inference_service, require_project_access
 from app.core.response import success
 from app.db.session import get_db
+from app.services.inference_service import InferenceService
 from src.agent.chat_engine import ChatEngine
 from src.agent.prompt_manager import PromptManager
 from src.agent.repository import AgentRepository
@@ -23,14 +24,11 @@ from src.agent.schemas import (
     ChatHistoryOut,
     ChatRequest,
     PromptCreate,
-    PromptOut,
     PromptRenderRequest,
     ToolBindRequest,
-    ToolOut,
 )
 from src.agent.service import AgentService
 from src.agent.tool_wrapper import ToolWrapper
-from app.services.inference_service import InferenceService
 
 router = APIRouter(prefix="/projects/{project_id}/agents", tags=["Agent"])
 
@@ -203,7 +201,7 @@ async def chat_history(
     service.get_agent(project_id, agent_id)  # verify agent exists
     conv = repo.get_conversation(conversation_id)
     if not conv or conv.agent_id != agent_id:
-        from app.core.errors import AppError, ERR_AGENT_NOT_FOUND
+        from app.core.errors import ERR_AGENT_NOT_FOUND, AppError
         raise AppError.not_found("Conversation not found", code=ERR_AGENT_NOT_FOUND)
 
     total = repo.count_messages(conversation_id)

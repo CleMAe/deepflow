@@ -259,7 +259,7 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
     } finally {
       setSavingLabels(false)
     }
-  }, [activeDataset?.id, localLabels, projectId, queryClient])
+  }, [activeDataset, localLabels, projectId, queryClient])
 
   return (
     <div>

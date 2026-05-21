@@ -9,7 +9,6 @@ from uuid import UUID
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-from shared.protocols import StorageProtocol
 
 from app.core.config import settings
 from app.core.errors import AppError
@@ -21,11 +20,11 @@ from app.services.cleaning_engine import PandasCleaningEngine
 from app.services.data_parser import PandasDataParser
 from app.services.dataset_service import DatasetService
 from app.services.eda_service import PandasEdaService
-from app.services.storage_mock import MockFileStorage
-from shared.protocols import DataParserProtocol
 from app.services.inference_service import InferenceService
+from app.services.storage_mock import MockFileStorage
 from app.services.training_service import TrainingService
 from app.services.upload_service import UploadService
+from shared.protocols import DataParserProtocol, StorageProtocol
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -121,8 +120,8 @@ async def require_project_access(
     user_id: Annotated[UUID, Depends(get_current_user_id)],
     db: Session = Depends(get_db),
 ) -> UUID:
+    from app.core.errors import ERR_PROJECT_FORBIDDEN, ERR_PROJECT_NOT_FOUND
     from src.infra.db.models.project import Project
-    from app.core.errors import ERR_PROJECT_NOT_FOUND, ERR_PROJECT_FORBIDDEN
 
     project = db.get(Project, project_id)
     if not project:

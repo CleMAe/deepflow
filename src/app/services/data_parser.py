@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from app.core.errors import AppError, ERR_DATASET_INVALID_PARAM
+from app.core.errors import ERR_DATASET_INVALID_PARAM, AppError
 from shared.protocols import ColumnMeta, DatasetFormat, ValidationResult
 
 

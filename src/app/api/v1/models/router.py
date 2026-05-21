@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from src.infra.db.models.ml_model import MLModel
 
 from app.api.deps import get_db, require_project_access
 from app.core.errors import AppError
@@ -21,9 +19,9 @@ from app.schemas.model import (
     ModelValidateRequest,
     PretrainedLoadRequest,
     PretrainedLoadStatus,
-    ValidationResult,
 )
 from app.services.model_library import ModelLibraryService
+from src.infra.db.models.ml_model import MLModel
 
 library_svc = ModelLibraryService()
 

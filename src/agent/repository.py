@@ -9,9 +9,9 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from shared.protocols import ChatRole
 from src.infra.db.models import Agent, AgentTool, ChatMessage, Conversation, PromptTemplate
 from src.infra.db.models.agent import AgentStatus
-from shared.protocols import ChatRole, ToolType
 
 
 class AgentRepository:
