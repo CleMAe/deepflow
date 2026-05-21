@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.api.deps import require_project_access
+from app.api.deps import require_project_access, get_inference_service
 from app.core.response import success
 from app.db.session import get_db
 from src.agent.chat_engine import ChatEngine
@@ -30,6 +30,7 @@ from src.agent.schemas import (
 )
 from src.agent.service import AgentService
 from src.agent.tool_wrapper import ToolWrapper
+from app.services.inference_service import InferenceService
 
 router = APIRouter(prefix="/projects/{project_id}/agents", tags=["Agent"])
 
@@ -52,10 +53,11 @@ def _agent_to_out(a: object) -> AgentOut:
 def _get_deps(
     db: Session = Depends(get_db),
     _pid: UUID = Depends(require_project_access),
+    inference_svc: InferenceService = Depends(get_inference_service),
 ):
     repo = AgentRepository(db)
     service = AgentService(repo)
-    tool_wrapper = ToolWrapper(repo)
+    tool_wrapper = ToolWrapper(repo, inference_service=inference_svc)
     chat_engine = ChatEngine(repo, tool_wrapper)
     prompt_manager = PromptManager(repo)
     return repo, service, chat_engine, prompt_manager, db

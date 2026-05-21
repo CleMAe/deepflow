@@ -1,18 +1,26 @@
-"""Model → OpenAI function-calling tool wrapper."""
+"""Model -> OpenAI function-calling tool wrapper."""
 
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from app.core.errors import AppError, ERR_AGENT_TOOL_BIND_FAILED, ERR_AGENT_TOOL_NOT_FOUND
+from app.core.errors import AppError, ERR_AGENT_TOOL_NOT_FOUND
 from src.agent.repository import AgentRepository
 from shared.protocols import ToolType
 
+if TYPE_CHECKING:
+    from app.services.inference_service import InferenceService
+
 
 class ToolWrapper:
-    def __init__(self, repo: AgentRepository) -> None:
+    def __init__(
+        self,
+        repo: AgentRepository,
+        inference_service: InferenceService | None = None,
+    ) -> None:
         self._repo = repo
+        self._inference_service = inference_service
 
     def get_tools_schema(self, agent_id: uuid.UUID) -> list[dict[str, Any]]:
         """Generate OpenAI function-calling compatible tools param for all bound tools."""
@@ -24,7 +32,7 @@ class ToolWrapper:
     def _tool_to_openai_schema(self, tool: Any) -> dict[str, Any]:
         desc = tool.description
         if not desc and tool.model_id:
-            desc = f"使用绑定的模型进行推理"
+            desc = "使用绑定的模型进行推理"
 
         config = tool.config or {}
         params_schema = config.get("params_schema", {
@@ -70,16 +78,31 @@ class ToolWrapper:
     async def _call_model_inference(self, tool: Any, arguments: dict[str, Any]) -> dict[str, Any]:
         """Call online inference for a bound model.
 
-        For now, returns a mock result since the real inference engine is still mock.
-        When P8 ships real online_inference, this will call InferenceEngineProtocol.
+        Uses InferenceService when available; falls back to mock result.
         """
         model_id = str(tool.model_id) if tool.model_id else None
         input_data = arguments.get("input", "")
 
-        # TODO: replace with real InferenceEngineProtocol.online_inference() when available
+        if self._inference_service and model_id:
+            try:
+                result = self._inference_service.online_inference(
+                    db=self._repo._db,
+                    project_id=tool.agent.project_id if hasattr(tool, "agent") and tool.agent else uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                    model_id=uuid.UUID(model_id),
+                    input_data=input_data,
+                )
+                return result.model_dump()
+            except Exception as e:
+                return {
+                    "error": str(e),
+                    "model_id": model_id,
+                    "input_preview": input_data[:100] if isinstance(input_data, str) else str(input_data)[:100],
+                }
+
+        # Fallback: mock result when inference service not available
         return {
             "prediction": "mock_prediction",
             "confidence": 0.95,
             "model_id": model_id,
-            "input_preview": input_data[:100] if input_data else "",
+            "input_preview": input_data[:100] if isinstance(input_data, str) else str(input_data)[:100],
         }
