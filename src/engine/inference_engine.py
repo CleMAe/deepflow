@@ -123,7 +123,7 @@ class InferenceEngine:
         torch = _import_torch()
         _is_cv_arch = _import_is_cv_arch()
 
-        start = time.monotonic()
+        start = time.perf_counter()
 
         model, ckpt, dev = self._load_model(checkpoint_path, device)
         arch_type = ckpt.get("arch_type", "mlp")
@@ -159,7 +159,7 @@ class InferenceEngine:
                     confidence_val = 1.0
                     prob_dict = {}
 
-        latency = round((time.monotonic() - start) * 1000, 2)
+        latency = max(round((time.perf_counter() - start) * 1000, 3), 0.001)
 
         return {
             "prediction": pred_label,
