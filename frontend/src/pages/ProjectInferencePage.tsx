@@ -1,4 +1,4 @@
-import { lazy, useMemo, useState, Suspense } from 'react'
+import { lazy, memo, useMemo, useState, Suspense } from 'react'
 const ReactECharts = lazy(() => import('echarts-for-react'))
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
@@ -173,7 +173,22 @@ function datasetLabel(dataset: Dataset) {
   return `${dataset.name ?? dataset.id} · ${dataset.format ?? 'dataset'} · ${samples}`
 }
 
-function MetricCards({ result }: { result?: EvaluateResult }) {
+function parseOnlineInput(value: string) {
+  const parsed = JSON.parse(value) as unknown
+  if (typeof parsed === 'string') {
+    return parsed
+  }
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>
+  }
+  throw new Error('invalid shape')
+}
+
+const ChartFallback = (
+  <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>加载图表...</div>
+)
+
+const MetricCards = memo(function MetricCards({ result }: { result?: EvaluateResult }) {
   const metrics = result?.metrics ?? {}
 
   return (
@@ -192,10 +207,10 @@ function MetricCards({ result }: { result?: EvaluateResult }) {
       </Col>
     </Row>
   )
-}
+})
 
-function OnlineResult({ result }: { result?: OnlineInferenceResult }) {
-  const probabilities = Object.entries(result?.probabilities ?? {})
+const OnlineResult = memo(function OnlineResult({ result }: { result?: OnlineInferenceResult }) {
+  const probabilities = useMemo(() => Object.entries(result?.probabilities ?? {}), [result?.probabilities])
 
   if (!result) {
     return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无推理结果" />
@@ -221,7 +236,7 @@ function OnlineResult({ result }: { result?: OnlineInferenceResult }) {
       </Space>
     </Space>
   )
-}
+})
 
 export default function ProjectInferencePage() {
   const { projectId } = useParams()
@@ -308,11 +323,7 @@ export default function ProjectInferencePage() {
     mutationFn: (values: OnlineFormValues) => {
       let inputData: Record<string, unknown> | string
       try {
-        const parsed = JSON.parse(values.input_data) as unknown
-        if (typeof parsed !== 'string' && (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))) {
-          throw new Error('invalid shape')
-        }
-        inputData = typeof parsed === 'string' ? parsed : (parsed as Record<string, unknown>)
+        inputData = parseOnlineInput(values.input_data)
       } catch {
         messageApi.error('输入必须是 JSON 对象或 JSON 字符串')
         return Promise.reject(new Error('invalid json'))
@@ -337,30 +348,40 @@ export default function ProjectInferencePage() {
 
   const loadingOptions = modelsQuery.isLoading || datasetsQuery.isLoading
   const batchTask = batchResultQuery.data ?? batchMutation.data
-  const batchPredictionRows = (batchTask?.predictions ?? []).map((item, index) => ({
-    key: `${batchTask?.task_id ?? 'batch'}-${index}`,
-    ...item,
-  }))
-  const batchPredictionColumns = [
-    {
-      title: '输入',
-      dataIndex: 'input',
-      key: 'input',
-      render: (value: unknown) => <Text code>{stringifyValue(value)}</Text>,
-    },
-    {
-      title: '预测',
-      dataIndex: 'prediction',
-      key: 'prediction',
-      render: (value: unknown) => stringifyValue(value),
-    },
-    {
-      title: '置信度',
-      dataIndex: 'confidence',
-      key: 'confidence',
-      render: (value?: number) => formatPercent(value),
-    },
-  ]
+  const confusionMatrixOption = useMemo(() => buildConfusionMatrixOption(evaluationResult), [evaluationResult])
+  const batchPredictionRows = useMemo(
+    () =>
+      (batchTask?.predictions ?? []).map((item, index) => ({
+        key: `${batchTask?.task_id ?? 'batch'}-${index}`,
+        ...item,
+      })),
+    [batchTask?.predictions, batchTask?.task_id]
+  )
+  const batchPredictionColumns = useMemo(
+    () => [
+      {
+        title: '输入',
+        dataIndex: 'input',
+        key: 'input',
+        ellipsis: true,
+        render: (value: unknown) => <Text code>{stringifyValue(value)}</Text>,
+      },
+      {
+        title: '预测',
+        dataIndex: 'prediction',
+        key: 'prediction',
+        render: (value: unknown) => stringifyValue(value),
+      },
+      {
+        title: '置信度',
+        dataIndex: 'confidence',
+        key: 'confidence',
+        width: 120,
+        render: (value?: number) => formatPercent(value),
+      },
+    ],
+    []
+  )
 
   const evaluationPanel = (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -373,12 +394,24 @@ export default function ProjectInferencePage() {
           <Row gutter={16}>
             <Col xs={24} lg={10}>
               <Form.Item name="model_id" label="模型" rules={[{ required: true, message: '请选择模型' }]}>
-                <Select loading={modelsQuery.isLoading} options={modelOptions} placeholder="选择模型" />
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  loading={modelsQuery.isLoading}
+                  options={modelOptions}
+                  placeholder="选择模型"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} lg={10}>
               <Form.Item name="dataset_id" label="数据集" rules={[{ required: true, message: '请选择数据集' }]}>
-                <Select loading={datasetsQuery.isLoading} options={datasetOptions} placeholder="选择数据集" />
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  loading={datasetsQuery.isLoading}
+                  options={datasetOptions}
+                  placeholder="选择数据集"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} lg={4}>
@@ -406,8 +439,8 @@ export default function ProjectInferencePage() {
         <>
           <MetricCards result={evaluationResult} />
           <Card title="混淆矩阵">
-            <Suspense fallback={<div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>加载图表...</div>}>
-              <ReactECharts option={buildConfusionMatrixOption(evaluationResult)} style={{ height: 360 }} />
+            <Suspense fallback={ChartFallback}>
+              <ReactECharts option={confusionMatrixOption} style={{ height: 360 }} />
             </Suspense>
           </Card>
         </>
@@ -429,9 +462,34 @@ export default function ProjectInferencePage() {
             onFinish={(values) => onlineMutation.mutate(values)}
           >
             <Form.Item name="model_id" label="模型" rules={[{ required: true, message: '请选择模型' }]}>
-              <Select loading={modelsQuery.isLoading} options={modelOptions} placeholder="选择模型" />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                loading={modelsQuery.isLoading}
+                options={modelOptions}
+                placeholder="选择模型"
+              />
             </Form.Item>
-            <Form.Item name="input_data" label="输入 JSON" rules={[{ required: true, message: '请输入 JSON' }]}>
+            <Form.Item
+              name="input_data"
+              label="输入 JSON"
+              validateTrigger="onBlur"
+              rules={[
+                { required: true, message: '请输入 JSON' },
+                {
+                  validator: async (_, value?: string) => {
+                    if (!value) {
+                      return
+                    }
+                    try {
+                      parseOnlineInput(value)
+                    } catch {
+                      throw new Error('请输入 JSON 对象或 JSON 字符串')
+                    }
+                  },
+                },
+              ]}
+            >
               <Input.TextArea rows={12} spellCheck={false} />
             </Form.Item>
             <Button type="primary" htmlType="submit" loading={onlineMutation.isPending} disabled={modelsQuery.isLoading}>
@@ -465,10 +523,22 @@ export default function ProjectInferencePage() {
             onFinish={(values) => batchMutation.mutate(values)}
           >
             <Form.Item name="model_id" label="模型" rules={[{ required: true, message: '请选择模型' }]}>
-              <Select loading={modelsQuery.isLoading} options={modelOptions} placeholder="选择模型" />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                loading={modelsQuery.isLoading}
+                options={modelOptions}
+                placeholder="选择模型"
+              />
             </Form.Item>
             <Form.Item name="dataset_id" label="数据集" rules={[{ required: true, message: '请选择数据集' }]}>
-              <Select loading={datasetsQuery.isLoading} options={datasetOptions} placeholder="选择数据集" />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                loading={datasetsQuery.isLoading}
+                options={datasetOptions}
+                placeholder="选择数据集"
+              />
             </Form.Item>
             <Form.Item name="output_format" label="输出格式" rules={[{ required: true, message: '请选择输出格式' }]}>
               <Select
@@ -530,7 +600,10 @@ export default function ProjectInferencePage() {
   return (
     <div>
       {contextHolder}
-      <h2 style={{ marginBottom: 24 }}>推理测试</h2>
+      <Space direction="vertical" size={4} style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0 }}>推理测试</h2>
+        <Text type="secondary">评估模型表现、运行批量推理，并用在线样本快速验证预测结果。</Text>
+      </Space>
       {!projectId && <Alert type="warning" showIcon message="未选择项目" style={{ marginBottom: 16 }} />}
       <Tabs
         items={[
