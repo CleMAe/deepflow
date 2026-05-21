@@ -46,3 +46,5 @@ uploads/
 .claude-role.md
 .claude-project.md
 .claude/
+
+tests/fixtures/synthetic_data/

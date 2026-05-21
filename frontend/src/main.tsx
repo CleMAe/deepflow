@@ -3,9 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { p3UseMock } from '@/config/p3Api'
 import './index.css'
 import App from './App'
+import { shouldEnableMsw } from './config/env'
 
 async function enableMocking() {
-  if (import.meta.env.DEV) {
+  if (shouldEnableMsw()) {
     const { worker } = await import('./mocks/browser')
     return worker.start({
       onUnhandledRequest: 'bypass',

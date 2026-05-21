@@ -8,10 +8,20 @@ export type AgentUpdate = components['schemas']['AgentUpdate']
 export type ChatMessage = components['schemas']['ChatMessage']
 export type ChatRequest = components['schemas']['ChatRequest']
 export type PaginatedChatHistory = components['schemas']['PaginatedChatHistory']
+export type AgentChatHistory = PaginatedChatHistory & {
+  conversation_id?: string
+  messages?: ChatMessage[]
+}
 export type PaginatedAgents = components['schemas']['PaginatedAgents']
 export type PromptTemplate = components['schemas']['PromptTemplate']
 export type PromptTemplateCreate = components['schemas']['PromptTemplateCreate']
 export type ToolBindRequest = components['schemas']['ToolBindRequest']
+
+export interface ChatHistoryQuery {
+  conversationId?: string
+  page?: number
+  pageSize?: number
+}
 
 export interface AgentStreamEvent {
   type: 'token' | 'content' | 'tool_call' | 'tool_result' | 'done' | 'error'
@@ -22,6 +32,7 @@ export interface AgentStreamEvent {
   args?: Record<string, unknown>
   result?: unknown
   message_id?: string
+  conversation_id?: string
 }
 
 function unwrapApiData<T>(res: unknown) {
@@ -62,16 +73,29 @@ export async function listPromptTemplates(projectId: string, agentId: string) {
   return unwrapApiData<PromptTemplate[]>(res)
 }
 
-export async function savePromptTemplate(projectId: string, agentId: string, payload: PromptTemplateCreate) {
+export async function savePromptTemplate(
+  projectId: string,
+  agentId: string,
+  payload: PromptTemplateCreate
+) {
   const res = await api.post(`/projects/${projectId}/agents/${agentId}/prompts`, payload)
   return unwrapApiData<PromptTemplate>(res)
 }
 
-export async function getChatHistory(projectId: string, agentId: string, conversationId: string) {
+export async function getChatHistory(
+  projectId: string,
+  agentId: string,
+  query: ChatHistoryQuery = {}
+) {
+  const { conversationId, page = 1, pageSize = 50 } = query
   const res = await api.get(`/projects/${projectId}/agents/${agentId}/chat/history`, {
-    params: { conversation_id: conversationId },
+    params: {
+      ...(conversationId ? { conversation_id: conversationId } : {}),
+      page,
+      page_size: pageSize,
+    },
   })
-  return unwrapApiData<PaginatedChatHistory>(res)
+  return unwrapApiData<AgentChatHistory>(res)
 }
 
 export async function streamAgentChat(
