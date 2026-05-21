@@ -16,19 +16,47 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
-import torch
-import torch.nn as nn
-
-from src.engine.train_worker import _build_model, _is_cv_arch
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
 # In-memory task store for async inference tasks (thread-safe via _lock)
 _tasks: dict[str, dict[str, Any]] = {}
 _lock = threading.Lock()
+
+
+def _import_torch():
+    import torch
+
+    return torch
+
+
+def _import_nn():
+    import torch.nn as nn
+
+    return nn
+
+
+def _import_numpy():
+    import numpy as np
+
+    return np
+
+
+def _import_build_model():
+    from src.engine.train_worker import _build_model
+
+    return _build_model
+
+
+def _import_is_cv_arch():
+    from src.engine.train_worker import _is_cv_arch
+
+    return _is_cv_arch
 
 
 class InferenceEngine:
@@ -39,10 +67,9 @@ class InferenceEngine:
         checkpoint_path: str,
         device: str = "auto",
     ) -> tuple[nn.Module, dict, torch.device]:
-        """Load a model from a checkpoint file.
+        torch = _import_torch()
+        _build_model = _import_build_model()
 
-        Returns (model, checkpoint_metadata, device).
-        """
         if not Path(checkpoint_path).exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
@@ -93,7 +120,9 @@ class InferenceEngine:
         input_data: dict[str, Any] | str,
         device: str = "auto",
     ) -> dict[str, Any]:
-        """Run inference on a single input. Returns prediction, confidence, probabilities, latency_ms."""
+        torch = _import_torch()
+        _is_cv_arch = _import_is_cv_arch()
+
         start = time.monotonic()
 
         model, ckpt, dev = self._load_model(checkpoint_path, device)
@@ -140,7 +169,7 @@ class InferenceEngine:
         }
 
     def _decode_image_input(self, base64_str: str, device: torch.device) -> torch.Tensor:
-        """Decode a base64-encoded image into a normalized tensor."""
+        torch = _import_torch()
         from torchvision import transforms
 
         img_bytes = base64.b64decode(base64_str)
@@ -161,7 +190,8 @@ class InferenceEngine:
         ckpt: dict,
         device: torch.device,
     ) -> torch.Tensor:
-        """Decode tabular input (dict of column→value) into a tensor."""
+        torch = _import_torch()
+
         if isinstance(input_data, str):
             input_data = json.loads(input_data)
 
@@ -200,7 +230,8 @@ class InferenceEngine:
         output_dir: str,
         device: str = "auto",
     ) -> None:
-        """Execute batch inference. Called from background thread."""
+        torch = _import_torch()
+
         with _lock:
             task = _tasks.get(task_id)
             if not task:
@@ -268,7 +299,9 @@ class InferenceEngine:
         metrics: list[str] | None = None,
         device: str = "auto",
     ) -> dict[str, Any]:
-        """Evaluate model on a dataset. Returns metrics, confusion_matrix, classification_report."""
+        torch = _import_torch()
+        np = _import_numpy()
+
         model, ckpt, dev = self._load_model(checkpoint_path, device)
         loader = self._load_dataset_for_inference(dataset_path, arch_type)
 
@@ -324,8 +357,9 @@ class InferenceEngine:
 
         return result
 
-    def _compute_classification_metrics(self, preds: np.ndarray, labels: np.ndarray) -> dict[str, float]:
-        """Compute macro-averaged precision, recall, F1."""
+    def _compute_classification_metrics(self, preds: Any, labels: Any) -> dict[str, float]:
+        np = _import_numpy()
+
         n_classes = max(int(labels.max()), int(preds.max())) + 1
         precisions, recalls, f1s = [], [], []
 
@@ -355,7 +389,9 @@ class InferenceEngine:
         opset_version: int = 17,
         dynamic_batch: bool = True,
     ) -> str:
-        """Export model to ONNX format. Returns the output path."""
+        torch = _import_torch()
+        _is_cv_arch = _import_is_cv_arch()
+
         model, ckpt, dev = self._load_model(checkpoint_path, device="cpu")
 
         arch_type = ckpt.get("arch_type", "mlp")
@@ -392,9 +428,9 @@ class InferenceEngine:
         dataset_path: str,
         arch_type: str,
         batch_size: int = 32,
-    ) -> torch.utils.data.DataLoader:
-        """Load a dataset for inference/evaluation. Raises FileNotFoundError if not loadable."""
+    ) -> Any:
         from src.engine.train_worker import _load_image_dataset, _load_tabular_dataset
+        _is_cv_arch = _import_is_cv_arch()
 
         path = Path(dataset_path)
         if not path.exists():
