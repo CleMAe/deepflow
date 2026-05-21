@@ -25,7 +25,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
-import { listInferenceDatasets } from '@/api/inference'
+import { listDatasets } from '@/api/datasets'
 import { listProjectModels } from '@/api/models'
 import {
   createTrainingJob,
@@ -157,7 +157,7 @@ export default function ProjectTrainingPage() {
 
   const datasetsQuery = useQuery({
     queryKey: ['datasets', projectId],
-    queryFn: () => listInferenceDatasets(projectId),
+    queryFn: () => listDatasets(projectId),
     enabled: !!projectId,
   })
 
@@ -302,31 +302,20 @@ export default function ProjectTrainingPage() {
 
   const resourceChartOption = useMemo(() => {
     if (!latest) return {}
+    const makeGauge = (name: string, value: number, center: string[]) => ({
+      type: 'gauge',
+      name,
+      min: 0,
+      max: 100,
+      center,
+      radius: '60%',
+      data: [{ value, name }],
+    })
     return {
       series: [
-        {
-          type: 'gauge',
-          name: 'GPU',
-          min: 0,
-          max: 100,
-          data: [{ value: latest.gpu_util, name: 'GPU %' }],
-        },
-        {
-          type: 'gauge',
-          name: 'CPU',
-          min: 0,
-          max: 100,
-          center: ['50%', '55%'],
-          data: [{ value: latest.cpu_util, name: 'CPU %' }],
-        },
-        {
-          type: 'gauge',
-          name: 'Memory',
-          min: 0,
-          max: 100,
-          center: ['80%', '55%'],
-          data: [{ value: latest.memory_util, name: 'Mem %' }],
-        },
+        makeGauge('GPU', latest.gpu_util, ['20%', '55%']),
+        makeGauge('CPU', latest.cpu_util, ['50%', '55%']),
+        makeGauge('Memory', latest.memory_util, ['80%', '55%']),
       ],
     }
   }, [latest])
