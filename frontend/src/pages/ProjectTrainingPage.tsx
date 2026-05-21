@@ -40,7 +40,7 @@ import {
   type TrainingJobCreate,
   type TrainingStatus,
 } from '@/api/training'
-import { useTrainingMetricsMock } from '@/hooks/useTrainingMetricsMock'
+import { useTrainingWebSocket } from '@/hooks/useTrainingWebSocket'
 
 const { Text } = Typography
 
@@ -176,7 +176,7 @@ export default function ProjectTrainingPage() {
 
   const monitorJob = monitorJobQuery.data ?? null
   const wsEnabled = activeTab === 'monitor' && monitorJob?.status === 'running'
-  const { history, logs, latest } = useTrainingMetricsMock(monitorJob, wsEnabled)
+  const { history, logs, latest, connected } = useTrainingWebSocket(projectId, monitorJob, wsEnabled)
 
   const readyDatasets = useMemo(
     () => (datasetsQuery.data?.items ?? []).filter((d) => d.status === 'ready' || !d.status),
@@ -522,25 +522,29 @@ export default function ProjectTrainingPage() {
 
       {monitorJob.status === 'running' ? (
         <>
-          <Card title="训练曲线（Mock WebSocket）">
+          <Card title="训练曲线">
             <Suspense fallback={<Spin />}>
               {history.length > 0 ? (
                 <ReactECharts option={lossChartOption} style={{ height: 320 }} />
               ) : (
-                <Text type="secondary">等待指标推送…</Text>
+                <Text type="secondary">{connected ? '等待指标推送…' : '正在连接 WebSocket…'}</Text>
               )}
             </Suspense>
           </Card>
           <Card title="资源监控">
             <Suspense fallback={<Spin />}>
-              {latest && <ReactECharts option={resourceChartOption} style={{ height: 220 }} />}
+              {latest && (latest.gpu_util > 0 || latest.cpu_util > 0 || latest.memory_util > 0) ? (
+                <ReactECharts option={resourceChartOption} style={{ height: 220 }} />
+              ) : (
+                <Text type="secondary">资源利用率数据暂未由后端推送</Text>
+              )}
             </Suspense>
           </Card>
         </>
       ) : (
         <Card>
           <Text type="secondary">
-            任务未在运行中。启动任务后可查看 Mock WebSocket 实时曲线（Day3 切换真实 WS）。
+            任务未在运行中。启动任务后可查看 WebSocket 实时训练曲线。
           </Text>
         </Card>
       )}

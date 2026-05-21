@@ -1,40 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import type { components } from '@/api/types'
 
-import { DEMO_DATASET_IMAGE_ID } from '@/mocks/demoIds'
-
-type Dataset = components['schemas']['Dataset']
-
 const labelStore = new Map<string, string[]>()
-
-function previewForDataset(ds: Dataset | undefined) {
-  if (!ds) {
-    return {
-      columns: ['col_a', 'col_b'],
-      rows: [{ col_a: '—', col_b: '—' }],
-      total_rows: 0,
-    }
-  }
-  if (ds.format === 'image') {
-    return {
-      columns: ['image_id', 'filename', 'labels'],
-      rows: [
-        { image_id: 'img-001', filename: 'sample_001.jpg', labels: 'cat' },
-        { image_id: 'img-002', filename: 'sample_002.jpg', labels: 'dog' },
-      ],
-      total_rows: ds.num_samples ?? 2,
-    }
-  }
-  return {
-    columns: ['date', 'region', 'sales'],
-    rows: [
-      { date: '2025-01-01', region: '华东', sales: 1280 },
-      { date: '2025-01-02', region: '华北', sales: 980 },
-      { date: '2025-01-03', region: '华南', sales: 1420 },
-    ],
-    total_rows: ds.num_samples ?? 3,
-  }
-}
 
 function mockImages(datasetId: string, page: number, pageSize: number) {
   const total = 24
@@ -56,24 +23,6 @@ function mockImages(datasetId: string, page: number, pageSize: number) {
 }
 
 export const p3Day2Handlers = [
-  http.get('/api/v1/projects/:projectId/datasets/:dsId/preview', ({ params }) => {
-    const dsId = params.dsId as string
-    const format: Dataset['format'] = dsId === DEMO_DATASET_IMAGE_ID ? 'image' : 'csv'
-    const mockDs: Dataset = {
-      id: dsId,
-      name: 'mock',
-      format,
-      num_samples: 100,
-    }
-    const data = previewForDataset(mockDs)
-    return HttpResponse.json({
-      code: 0,
-      message: 'success',
-      data,
-      request_id: `mock-p3-preview-${dsId}`,
-    })
-  }),
-
   http.get('/api/v1/projects/:projectId/datasets/:dsId/images', ({ params, request }) => {
     const url = new URL(request.url)
     const page = Number(url.searchParams.get('page') || 1)

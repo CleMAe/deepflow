@@ -160,7 +160,7 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
     } finally {
       setSavingLabels(false)
     }
-  }, [activeDataset?.id, localLabels, projectId, queryClient])
+  }, [activeDataset, localLabels, projectId, queryClient])
 
   const galleryItems = imagesQuery.data?.items ?? []
 
@@ -201,8 +201,8 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
         {activeDataset && (
           <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
             {inferPreviewKind(activeDataset) === 'image'
-              ? '图像数据集：展示元数据与标签字段预览（Mock）'
-              : '表格数据：展示前若干行样例（Mock）'}
+              ? '图像数据集：展示元数据与标签字段预览'
+              : '表格数据：展示前若干行样例'}
           </Text>
         )}
         <Table
@@ -281,7 +281,7 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
             下一页
           </Button>
           <Text type="secondary">
-            第 {galleryPage} 页 · 共 {imagesQuery.data?.total ?? 0} 张（Mock）
+            第 {galleryPage} 页 · 共 {imagesQuery.data?.total ?? 0} 张
           </Text>
         </Space>
       </Modal>

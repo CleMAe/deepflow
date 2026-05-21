@@ -53,7 +53,7 @@ export default function EdaReportTab({ projectId }: EdaReportTabProps) {
       }),
     onSuccess: (data) => {
       setLocalReport(data)
-      message.success('EDA 分析完成（Mock）')
+      message.success('EDA 分析完成')
       void reportQuery.refetch()
     },
     onError: () => message.error('EDA 触发失败'),
@@ -113,7 +113,7 @@ export default function EdaReportTab({ projectId }: EdaReportTabProps) {
       ) : reportQuery.isLoading && !localReport ? (
         <Text type="secondary">加载中…</Text>
       ) : !report ? (
-        <Empty description="点击「运行 EDA」生成报告（Mock）" />
+        <Empty description="点击「运行 EDA」生成报告" />
       ) : (
         <>
           <Card title="统计概览" size="small" style={{ marginBottom: 16 }}>
@@ -136,7 +136,7 @@ export default function EdaReportTab({ projectId }: EdaReportTabProps) {
             />
           </Card>
 
-          <Typography.Title level={5}>可视化（ECharts · Mock 数据）</Typography.Title>
+          <Typography.Title level={5}>可视化（ECharts）</Typography.Title>
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             {(report.visualizations ?? []).map((viz, idx) => {
               const opt = toOption(viz)

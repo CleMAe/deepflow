@@ -63,7 +63,7 @@ function ResultAlert({ result }: { result: CleaningResult | null }) {
       type="success"
       showIcon
       style={{ marginTop: 16 }}
-      message="执行结果（Mock）"
+      message="执行结果"
       description={
         <Space direction="vertical" size={4}>
           <Text>

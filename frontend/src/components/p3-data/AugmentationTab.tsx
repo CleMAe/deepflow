@@ -72,7 +72,7 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
     mutationFn: (body: AugmentRequest) => augmentDataset(projectId, datasetId!, body),
     onSuccess: (data) => {
       setLastResult(data)
-      message.success('数据增强任务已提交（Mock）')
+      message.success('数据增强任务已提交')
       void queryClient.invalidateQueries({ queryKey: ['datasets', projectId] })
     },
     onError: () => message.error('请求失败'),
@@ -119,7 +119,7 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
   return (
     <div>
       <Paragraph type="secondary">
-        配置 CV 数据增强：旋转 / 翻转 / 色彩扰动 / MixUp / CutMix 等；强度由滑块统一调节（Mock 联调）。
+        配置 CV 数据增强：旋转 / 翻转 / 色彩扰动 / MixUp / CutMix 等；强度由滑块统一调节。
       </Paragraph>
 
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -187,7 +187,7 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
         </Button>
 
         {lastResult ? (
-          <Card title="执行结果（Mock）" size="small">
+          <Card title="执行结果" size="small">
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="原始样本数">{lastResult.original_count ?? '-'}</Descriptions.Item>
               <Descriptions.Item label="增强后样本数">{lastResult.augmented_count ?? '-'}</Descriptions.Item>
