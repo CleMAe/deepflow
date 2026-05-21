@@ -4,11 +4,9 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Form,
   Input,
   InputNumber,
-  Row,
   Select,
   Space,
   Switch,
@@ -16,6 +14,8 @@ import {
   message,
 } from 'antd'
 import { listDatasets, type Dataset } from '@/api/datasets'
+import { datasetOptionLabel, isTabularDataset } from '@/components/p3-data/datasetFormat'
+import { formatApiError } from '@/lib/formatApiError'
 import {
   cleanDedup,
   cleanEncode,
@@ -56,14 +56,17 @@ const ENCODE_METHODS: CleanEncodeRequest['method'][] = [
   'frequency_encoding',
 ]
 
+/** 表单扩展：OpenAPI 生成类型尚未包含 target_column，但 target_encoding 接口需要 */
+type EncodeFormValues = CleanEncodeRequest & { target_column?: string }
+
 function ResultAlert({ result }: { result: CleaningResult | null }) {
   if (!result) return null
   return (
     <Alert
+      className="p3-ds-result"
       type="success"
       showIcon
-      style={{ marginTop: 16 }}
-      message="执行结果（Mock）"
+      message="执行结果"
       description={
         <Space direction="vertical" size={4}>
           <Text>
@@ -86,7 +89,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
   const [missingForm] = Form.useForm<CleanMissingRequest>()
   const [outlierForm] = Form.useForm<CleanOutlierRequest>()
   const [dedupForm] = Form.useForm<CleanDedupRequest>()
-  const [encodeForm] = Form.useForm<CleanEncodeRequest>()
+  const [encodeForm] = Form.useForm<EncodeFormValues>()
   const [typeForm] = Form.useForm<CleanTypeConvertRequest>()
 
   const datasetsQuery = useQuery({
@@ -95,13 +98,18 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
     enabled: !!projectId,
   })
 
+  const tabularItems = useMemo(
+    () => (datasetsQuery.data?.items ?? []).filter((d: Dataset) => isTabularDataset(d)),
+    [datasetsQuery.data?.items],
+  )
+
   const options = useMemo(
     () =>
-      (datasetsQuery.data?.items ?? []).map((d: Dataset) => ({
+      tabularItems.map((d: Dataset) => ({
         value: d.id!,
-        label: `${d.name ?? d.id} (${d.format ?? '?'})`,
+        label: datasetOptionLabel(d),
       })),
-    [datasetsQuery.data?.items],
+    [tabularItems],
   )
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['datasets', projectId] })
@@ -113,7 +121,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('缺失值处理已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const outlierMut = useMutation({
@@ -123,7 +131,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('异常值处理已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const dedupMut = useMutation({
@@ -133,7 +141,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('去重已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const encodeMut = useMutation({
@@ -143,7 +151,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('编码转换已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const typeMut = useMutation({
@@ -153,7 +161,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
       message.success('类型转换已提交')
       invalidate()
     },
-    onError: () => message.error('请求失败'),
+    onError: (err) => message.error(formatApiError(err)),
   })
 
   const requireDs = () => {
@@ -164,26 +172,44 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
     return true
   }
 
+  if (datasetsQuery.isError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="无法加载数据集"
+        description={formatApiError(datasetsQuery.error, '请从工作台进入 Demo Project')}
+      />
+    )
+  }
+
   return (
-    <div>
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Text>当前数据集：</Text>
+    <div className="p3-ds-body">
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="仅支持 CSV / JSON 表格数据集"
+        description="图像数据集请使用「数据增强」页；清洗结果会写回数据集文件。"
+      />
+      <div className="p3-ds-toolbar" style={{ margin: '0 0 16px', padding: '12px 0', background: 'transparent', border: 'none' }}>
+        <span className="p3-ds-toolbar-label">当前数据集</span>
         <Select
           allowClear
           showSearch
           optionFilterProp="label"
-          placeholder="选择数据集"
-          style={{ minWidth: 280 }}
+          placeholder="选择要清洗的数据集"
+          style={{ minWidth: 320 }}
           options={options}
           value={datasetId}
           onChange={(v) => setDatasetId(v)}
           loading={datasetsQuery.isLoading}
         />
-      </Space>
+        {datasetId ? <span className="p3-ds-badge">已选择</span> : null}
+      </div>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Card title="缺失值处理" size="small">
+      <div className="p3-ds-tools-grid">
+        <Card title="缺失值处理" size="small" className="p3-ds-tool-card">
             <Form
               form={missingForm}
               layout="vertical"
@@ -219,10 +245,8 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
               </Button>
             </Form>
           </Card>
-        </Col>
 
-        <Col xs={24} lg={12}>
-          <Card title="异常值处理" size="small">
+        <Card title="异常值处理" size="small" className="p3-ds-tool-card">
             <Form
               form={outlierForm}
               layout="vertical"
@@ -249,10 +273,8 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
               </Button>
             </Form>
           </Card>
-        </Col>
 
-        <Col xs={24} lg={12}>
-          <Card title="去重" size="small">
+        <Card title="去重" size="small" className="p3-ds-tool-card">
             <Form
               form={dedupForm}
               layout="vertical"
@@ -276,17 +298,27 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
               </Button>
             </Form>
           </Card>
-        </Col>
 
-        <Col xs={24} lg={12}>
-          <Card title="编码转换" size="small">
+        <Card title="编码转换" size="small" className="p3-ds-tool-card">
             <Form
               form={encodeForm}
               layout="vertical"
               initialValues={{ method: 'label_encoding' }}
               onFinish={(v) => {
                 if (!requireDs()) return
-                encodeMut.mutate(v)
+                const payload: EncodeFormValues = {
+                  columns: v.columns,
+                  method: v.method,
+                }
+                if (v.method === 'target_encoding') {
+                  const targetColumn = v.target_column?.trim()
+                  if (!targetColumn) {
+                    message.warning('目标编码需填写 target_column（数值列名）')
+                    return
+                  }
+                  payload.target_column = targetColumn
+                }
+                encodeMut.mutate(payload as CleanEncodeRequest)
               }}
             >
               <Form.Item name="columns" label="列" rules={[{ required: true }]}>
@@ -295,15 +327,27 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
               <Form.Item name="method" label="编码方式" rules={[{ required: true }]}>
                 <Select options={ENCODE_METHODS.map((m) => ({ value: m, label: m }))} />
               </Form.Item>
+              <Form.Item noStyle shouldUpdate={(p, c) => p.method !== c.method}>
+                {() =>
+                  encodeForm.getFieldValue('method') === 'target_encoding' ? (
+                    <Form.Item
+                      name="target_column"
+                      label="target_column（数值列）"
+                      rules={[{ required: true, message: '请填写用于目标编码的数值列名' }]}
+                      extra="须为数据集中已存在的数值型列，且不能出现在上方「列」列表中"
+                    >
+                      <Input placeholder="例如 risk_label、price" />
+                    </Form.Item>
+                  ) : null
+                }
+              </Form.Item>
               <Button type="primary" htmlType="submit" loading={encodeMut.isPending}>
                 执行
               </Button>
             </Form>
           </Card>
-        </Col>
 
-        <Col span={24}>
-          <Card title="类型转换" size="small">
+        <Card title="类型转换" size="small" className="p3-ds-tool-card" style={{ gridColumn: '1 / -1' }}>
             <Form
               form={typeForm}
               layout="vertical"
@@ -351,8 +395,7 @@ export default function CleaningOperationsTab({ projectId }: CleaningOperationsT
               </Button>
             </Form>
           </Card>
-        </Col>
-      </Row>
+      </div>
 
       <ResultAlert result={lastResult} />
     </div>

@@ -89,6 +89,35 @@ export const datasetHandlers = [
     })
   }),
 
+  http.put('/api/v1/projects/:projectId/datasets/:dsId', async ({ params, request }) => {
+    const body = (await request.json()) as { name?: string; tags?: string[] }
+    const idx = mockDatasets.findIndex((d) => d.id === params.dsId)
+    if (idx < 0) {
+      return HttpResponse.json({ code: 30020001, message: 'Dataset not found' }, { status: 404 })
+    }
+    mockDatasets[idx] = { ...mockDatasets[idx], ...body }
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: mockDatasets[idx],
+      request_id: 'mock-req-update-ds',
+    })
+  }),
+
+  http.delete('/api/v1/projects/:projectId/datasets/:dsId', ({ params }) => {
+    const idx = mockDatasets.findIndex((d) => d.id === params.dsId)
+    if (idx < 0) {
+      return HttpResponse.json({ code: 30020001, message: 'Dataset not found' }, { status: 404 })
+    }
+    mockDatasets.splice(idx, 1)
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: { dataset_id: params.dsId },
+      request_id: 'mock-req-delete-ds',
+    })
+  }),
+
   http.post('/api/v1/projects/:projectId/datasets/upload/:uploadId/complete', async ({ params, request }) => {
     const session = uploadSessions.get(params.uploadId as string)
     if (!session) {

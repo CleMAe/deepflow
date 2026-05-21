@@ -12,6 +12,8 @@ export type EDAReport = components['schemas']['EDAReport']
 export type AugmentRequest = components['schemas']['AugmentRequest']
 export type AugmentResult = components['schemas']['AugmentResult']
 export type AugmentTransform = components['schemas']['AugmentTransform']
+export type SplitRequest = components['schemas']['SplitRequest']
+export type SplitResult = components['schemas']['SplitResult']
 
 function unwrap<T>(res: unknown): T {
   return (res as ApiResponse<T>).data as T
@@ -55,4 +57,9 @@ export async function getEdaReport(projectId: string, datasetId: string) {
 export async function augmentDataset(projectId: string, datasetId: string, body: AugmentRequest) {
   const res = await api.post(`/projects/${projectId}/datasets/${datasetId}/augment`, body)
   return unwrap<AugmentResult>(res)
+}
+
+export async function splitDataset(projectId: string, datasetId: string, body: SplitRequest) {
+  const res = await api.post(`/projects/${projectId}/datasets/${datasetId}/split`, body)
+  return unwrap<SplitResult>(res)
 }

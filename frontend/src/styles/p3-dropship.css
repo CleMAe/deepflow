@@ -1,0 +1,367 @@
+/**
+ * P3 UI — inspired by Dropship.io (clean SaaS, product cards, metrics, blue CTAs)
+ * https://www.dropship.io/
+ */
+
+.p3-ds-page {
+  --ds-bg: #f4f6f9;
+  --ds-surface: #ffffff;
+  --ds-primary: #2563eb;
+  --ds-primary-hover: #1d4ed8;
+  --ds-text: #0f172a;
+  --ds-muted: #64748b;
+  --ds-border: #e2e8f0;
+  --ds-green: #16a34a;
+  --ds-radius: 12px;
+  --ds-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+  margin: -24px;
+  padding: 0 0 28px;
+  background: var(--ds-bg);
+  border-radius: 8px;
+  color: var(--ds-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Hero */
+.p3-ds-hero {
+  padding: 28px 28px 20px;
+  background: var(--ds-surface);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.p3-ds-hero h1,
+.p3-ds-hero h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ds-text);
+  line-height: 1.25;
+}
+
+.p3-ds-hero .p3-ds-accent {
+  color: var(--ds-primary);
+  font-weight: 700;
+}
+
+.p3-ds-hero-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-muted);
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+/* Filter toolbar */
+.p3-ds-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  background: var(--ds-surface);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.p3-ds-toolbar-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.p3-ds-body {
+  padding: 20px 28px 8px;
+}
+
+/* Stat metrics row (Dropship revenue-style) */
+.p3-ds-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.p3-ds-stat-card {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  padding: 14px 16px;
+  box-shadow: var(--ds-shadow);
+}
+
+.p3-ds-stat-card .label {
+  display: block;
+  font-size: 12px;
+  color: var(--ds-muted);
+  margin-bottom: 4px;
+}
+
+.p3-ds-stat-card .value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ds-text);
+  line-height: 1.2;
+}
+
+.p3-ds-stat-card .value.green {
+  color: var(--ds-green);
+}
+
+/* Cards */
+.p3-ds-page .p3-ds-card.ant-card,
+.p3-ds-page .ant-card {
+  border-radius: var(--ds-radius) !important;
+  border: 1px solid var(--ds-border) !important;
+  box-shadow: var(--ds-shadow) !important;
+  margin-bottom: 16px;
+}
+
+.p3-ds-page .ant-card-head {
+  border-bottom: 1px solid var(--ds-border);
+  min-height: 48px;
+  background: var(--ds-surface);
+}
+
+.p3-ds-page .ant-card-head-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ds-text);
+}
+
+.p3-ds-card-upload .ant-card-body {
+  background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+}
+
+.p3-ds-page .ant-btn-primary {
+  background: var(--ds-primary);
+  border-color: var(--ds-primary);
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.p3-ds-page .ant-btn-primary:hover {
+  background: var(--ds-primary-hover) !important;
+  border-color: var(--ds-primary-hover) !important;
+}
+
+.p3-ds-page .ant-table-thead > tr > th {
+  background: #f8fafc !important;
+  color: var(--ds-muted) !important;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.p3-ds-page .ant-table-tbody > tr:hover > td {
+  background: #f1f5f9 !important;
+}
+
+.p3-ds-page .ant-tag {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* Tool cards grid (cleaning / augment) */
+.p3-ds-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.p3-ds-tool-card.ant-card .ant-card-head {
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.p3-ds-tool-card .ant-card-head-title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ds-primary);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.p3-ds-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #dbeafe;
+  color: var(--ds-primary);
+  margin-left: 8px;
+}
+
+.p3-ds-badge.hot {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.p3-ds-badge.new {
+  background: #dcfce7;
+  color: var(--ds-green);
+}
+
+/* EDA layout */
+.p3-ds-eda-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .p3-ds-eda-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.p3-ds-sidebar-panel {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  padding: 18px;
+  box-shadow: var(--ds-shadow);
+  position: sticky;
+  top: 16px;
+}
+
+.p3-ds-sidebar-panel h4 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.p3-ds-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .p3-ds-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Augment transform pills */
+.p3-ds-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.p3-ds-page .p3-ds-pill-group .ant-checkbox-wrapper {
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+  transition: all 0.15s ease;
+}
+
+.p3-ds-page .p3-ds-pill-group .ant-checkbox-wrapper-checked {
+  border-color: var(--ds-primary);
+  background: #eff6ff;
+  color: var(--ds-primary);
+  font-weight: 600;
+}
+
+.p3-ds-preview-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .p3-ds-preview-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.p3-ds-preview-box {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  padding: 12px;
+  background: #fafbfc;
+  text-align: center;
+}
+
+.p3-ds-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 14px;
+}
+
+.p3-ds-gallery-grid .ant-card {
+  border-radius: 10px !important;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.p3-ds-gallery-grid .ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1) !important;
+}
+
+.p3-ds-result {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--ds-radius);
+}
+
+/* Tabs shell */
+.p3-ds-tabs-wrap .ant-tabs-nav {
+  margin: 0;
+  padding: 12px 20px 0;
+  background: var(--ds-surface);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.p3-ds-tabs-wrap .ant-tabs-tab {
+  padding: 10px 18px;
+  font-weight: 500;
+}
+
+.p3-ds-tabs-wrap .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ds-primary);
+  font-weight: 600;
+}
+
+.p3-ds-tabs-wrap .ant-tabs-ink-bar {
+  background: var(--ds-primary);
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+}
+
+.p3-ds-tabs-wrap > .ant-card {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent;
+}
+
+.p3-ds-tabs-wrap > .ant-card > .ant-card-body {
+  padding: 0;
+}
+
+.p3-ds-tabs-wrap .p3-ds-body {
+  padding: 20px 28px 28px;
+}
+
+/* Checkbox pill group layout */
+.p3-ds-page .p3-ds-pill-group.ant-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
