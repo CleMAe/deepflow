@@ -69,18 +69,42 @@ export const experimentHandlers = [
     return HttpResponse.json({ code: 0, message: 'success', data: exp, request_id: 'mock-experiments-get' })
   }),
 
+  http.put('/api/v1/projects/:projectId/experiments/:expId', async ({ params, request }) => {
+    const body = (await request.json()) as { tags?: string[]; notes?: string }
+    const index = mockExperiments.findIndex((e) => e.id === params.expId)
+    if (index < 0) {
+      return HttpResponse.json({ code: 40020001, message: 'experiment not found' }, { status: 404 })
+    }
+    mockExperiments[index] = {
+      ...mockExperiments[index],
+      tags: body.tags ?? mockExperiments[index].tags,
+      notes: body.notes ?? mockExperiments[index].notes,
+    }
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: mockExperiments[index],
+      request_id: 'mock-experiments-update',
+    })
+  }),
+
   http.post('/api/v1/projects/:projectId/experiments/compare', async ({ request }) => {
     const body = (await request.json()) as { experiment_ids: string[] }
-    const selected = mockExperiments.filter((e) => body.experiment_ids.includes(e.id!))
-    const metricComparison: Record<string, number[]> = {}
+    const selected = body.experiment_ids
+      .map((id) => mockExperiments.find((e) => e.id === id))
+      .filter((e): e is Experiment => Boolean(e))
+
+    const metricKeys = new Set<string>()
     selected.forEach((exp) => {
-      Object.entries(exp.metrics ?? {}).forEach(([key, val]) => {
-        if (typeof val === 'number') {
-          if (!metricComparison[key]) metricComparison[key] = []
-          metricComparison[key].push(val)
-        }
-      })
+      Object.keys(exp.metrics ?? {}).forEach((key) => metricKeys.add(key))
     })
+    const metricComparison: Record<string, number[]> = {}
+    for (const key of metricKeys) {
+      metricComparison[key] = selected.map((exp) => {
+        const val = (exp.metrics ?? {})[key]
+        return typeof val === 'number' ? val : 0
+      })
+    }
     return HttpResponse.json({
       code: 0,
       message: 'success',

@@ -3,6 +3,7 @@ const ReactECharts = lazy(() => import('echarts-for-react'))
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
+  Alert,
   Button,
   Card,
   Checkbox,
@@ -23,6 +24,7 @@ import {
   Typography,
   message,
 } from 'antd'
+import ExperimentsPanel from '@/components/training/ExperimentsPanel'
 import type { ColumnsType } from 'antd/es/table'
 import axios from 'axios'
 import { listDatasets } from '@/api/datasets'
@@ -30,6 +32,7 @@ import { listProjectModels } from '@/api/models'
 import {
   createTrainingJob,
   getTrainingJob,
+  getTrainingLogs,
   listCheckpoints,
   listTrainingJobs,
   pauseTrainingJob,
@@ -40,7 +43,9 @@ import {
   type TrainingJobCreate,
   type TrainingStatus,
 } from '@/api/training'
+import { shouldEnableMsw } from '@/config/env'
 import { useTrainingMetricsMock } from '@/hooks/useTrainingMetricsMock'
+import { useTrainingWebSocket } from '@/hooks/useTrainingWebSocket'
 
 const { Text } = Typography
 
@@ -175,8 +180,64 @@ export default function ProjectTrainingPage() {
   })
 
   const monitorJob = monitorJobQuery.data ?? null
-  const wsEnabled = activeTab === 'monitor' && monitorJob?.status === 'running'
-  const { history, logs, latest } = useTrainingMetricsMock(monitorJob, wsEnabled)
+  const realApi = !shouldEnableMsw()
+  const monitorActive = activeTab === 'monitor' && !!monitorJobId
+  const isRunning = monitorJob?.status === 'running'
+  const useWs = realApi && isRunning && monitorActive
+  const useMock = !realApi && isRunning && monitorActive
+
+  const onWsEvent = useCallback(
+    (msg: { type: string }) => {
+      if (msg.type === 'status_change') {
+        void queryClient.invalidateQueries({ queryKey: ['training-jobs', projectId] })
+        if (monitorJobId) {
+          void queryClient.invalidateQueries({ queryKey: ['training-job', projectId, monitorJobId] })
+        }
+      }
+    },
+    [queryClient, projectId, monitorJobId]
+  )
+
+  const wsStream = useTrainingWebSocket(monitorJobId, useWs, onWsEvent)
+  const mockStream = useTrainingMetricsMock(monitorJob, useMock || (realApi && wsStream.failed && isRunning))
+  const useMockData = useMock || (realApi && wsStream.failed && isRunning)
+
+  const history = useMemo(() => {
+    if (useWs && wsStream.history.length > 0) return wsStream.history
+    if (useMockData) return mockStream.history
+    return []
+  }, [useWs, wsStream.history, useMockData, mockStream.history])
+
+  const latest = useMemo(() => {
+    if (useWs && wsStream.latest) return wsStream.latest
+    if (useMockData) return mockStream.latest
+    return null
+  }, [useWs, wsStream.latest, useMockData, mockStream.latest])
+
+  const logsQuery = useQuery({
+    queryKey: ['training-logs', projectId, monitorJobId],
+    queryFn: () => getTrainingLogs(projectId, monitorJobId!),
+    enabled: !!projectId && !!monitorJobId && monitorActive,
+  })
+
+  const displayLogs = useMemo(() => {
+    const base = logsQuery.data?.logs ?? []
+    const stream = useWs ? wsStream.logs : useMockData ? mockStream.logs : []
+    const merged = [...base, ...stream]
+    return merged.length ? merged : ['暂无日志']
+  }, [logsQuery.data?.logs, wsStream.logs, mockStream.logs, useWs, useMockData])
+
+  const streamLabel = useWs
+    ? wsStream.connected
+      ? 'WebSocket 实时'
+      : wsStream.failed
+        ? 'WebSocket 失败 · Mock 回退'
+        : 'WebSocket 连接中'
+    : useMockData
+      ? 'MSW Mock'
+      : realApi
+        ? 'REST'
+        : 'MSW'
 
   const readyDatasets = useMemo(
     () => (datasetsQuery.data?.items ?? []).filter((d) => d.status === 'ready' || !d.status),
@@ -522,7 +583,7 @@ export default function ProjectTrainingPage() {
 
       {monitorJob.status === 'running' ? (
         <>
-          <Card title="训练曲线（Mock WebSocket）">
+          <Card title={`训练曲线（${streamLabel}）`}>
             <Suspense fallback={<Spin />}>
               {history.length > 0 ? (
                 <ReactECharts option={lossChartOption} style={{ height: 320 }} />
@@ -540,8 +601,15 @@ export default function ProjectTrainingPage() {
       ) : (
         <Card>
           <Text type="secondary">
-            任务未在运行中。启动任务后可查看 Mock WebSocket 实时曲线（Day3 切换真实 WS）。
+            任务未在运行中。启动后可查看实时曲线（真实模式为 WebSocket，Mock 模式为 MSW 模拟）。
           </Text>
+          {monitorJob.metrics && (
+            <Descriptions column={2} size="small" style={{ marginTop: 12 }}>
+              <Descriptions.Item label="train_loss">{monitorJob.metrics.train_loss}</Descriptions.Item>
+              <Descriptions.Item label="val_loss">{monitorJob.metrics.val_loss}</Descriptions.Item>
+              <Descriptions.Item label="accuracy">{monitorJob.metrics.accuracy}</Descriptions.Item>
+            </Descriptions>
+          )}
         </Card>
       )}
 
@@ -558,7 +626,7 @@ export default function ProjectTrainingPage() {
                 padding: 12,
               }}
             >
-              {(logs.length > 0 ? logs : ['暂无日志']).map((line, i) => (
+              {displayLogs.map((line, i) => (
                 <div key={`${line}-${i}`}>{line}</div>
               ))}
             </div>
@@ -597,9 +665,22 @@ export default function ProjectTrainingPage() {
   return (
     <div>
       <Space style={{ marginBottom: 24, width: '100%', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0 }}>训练监控</h2>
+        <Space>
+          <h2 style={{ margin: 0 }}>训练监控</h2>
+          <Tag color={realApi ? 'green' : 'blue'}>{realApi ? '真实 API' : 'MSW Mock'}</Tag>
+        </Space>
         <Link to={`/projects/${projectId}/models`}>模型构建</Link>
       </Space>
+
+      {realApi && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="真实 API 模式"
+          description="请确保后端 uvicorn :8000 已启动。Demo 项目 ID 见 docs/backend/P7_RUN.md。"
+        />
+      )}
 
       <Tabs
         activeKey={activeTab}
@@ -608,6 +689,7 @@ export default function ProjectTrainingPage() {
           { key: 'jobs', label: '训练任务', children: jobsTab },
           { key: 'create', label: '创建任务', children: createTab },
           { key: 'monitor', label: '实时监控', children: monitorTab },
+          { key: 'experiments', label: '实验管理', children: <ExperimentsPanel projectId={projectId} /> },
         ]}
       />
     </div>
