@@ -353,7 +353,7 @@ export default function ProjectModelsPage() {
     <div>
       <Space style={{ marginBottom: 24, width: '100%', justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0 }}>模型构建</h2>
-        <Link to={`/projects/${projectId}/training`}>前往训练监控（Day2）</Link>
+        <Link to={`/projects/${projectId}/training`}>前往训练监控</Link>
       </Space>
 
       <Tabs

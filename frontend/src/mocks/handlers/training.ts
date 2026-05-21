@@ -79,13 +79,22 @@ export const trainingHandlers = [
   }),
 
   http.post('/api/v1/projects/:projectId/training-jobs', async ({ request, params }) => {
-    const body = (await request.json()) as { name: string; model_id: string; dataset_id: string; hyperparams?: Record<string, unknown>; device?: string; description?: string }
+    const body = (await request.json()) as {
+      name: string
+      model_id: string
+      dataset_id: string
+      val_dataset_id?: string
+      hyperparams?: Record<string, unknown>
+      device?: string
+      description?: string
+    }
     const newJob: TrainingJob = {
       id: `job-${Math.random().toString(36).slice(2)}`,
       project_id: params.projectId as string,
       name: body.name,
       model_id: body.model_id,
       dataset_id: body.dataset_id,
+      val_dataset_id: body.val_dataset_id,
       hyperparams: body.hyperparams ?? {},
       status: 'pending',
       device: body.device ?? 'auto',

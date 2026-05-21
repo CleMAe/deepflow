@@ -23,6 +23,7 @@ from app.services.dataset_service import DatasetService
 from app.services.eda_service import PandasEdaService
 from app.services.storage_mock import MockFileStorage
 from shared.protocols import DataParserProtocol
+from app.services.inference_service import InferenceService
 from app.services.training_service import TrainingService
 from app.services.upload_service import UploadService
 
@@ -85,6 +86,12 @@ def get_training_service(
     storage: StorageProtocol = Depends(get_storage),
 ) -> TrainingService:
     return TrainingService(storage)
+
+
+def get_inference_service(
+    storage: StorageProtocol = Depends(get_storage),
+) -> InferenceService:
+    return InferenceService(storage)
 
 
 async def get_current_user_id(
