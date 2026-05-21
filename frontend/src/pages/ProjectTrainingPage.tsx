@@ -43,7 +43,7 @@ import {
   type TrainingJobCreate,
   type TrainingStatus,
 } from '@/api/training'
-import { isRealApiMode } from '@/lib/apiMode'
+import { shouldEnableMsw } from '@/config/env'
 import { useTrainingMetricsMock } from '@/hooks/useTrainingMetricsMock'
 import { useTrainingWebSocket } from '@/hooks/useTrainingWebSocket'
 
@@ -180,7 +180,7 @@ export default function ProjectTrainingPage() {
   })
 
   const monitorJob = monitorJobQuery.data ?? null
-  const realApi = isRealApiMode()
+  const realApi = !shouldEnableMsw()
   const monitorActive = activeTab === 'monitor' && !!monitorJobId
   const isRunning = monitorJob?.status === 'running'
   const useWs = realApi && isRunning && monitorActive
