@@ -261,66 +261,95 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
     }
   }, [activeDataset, localLabels, projectId, queryClient])
 
+  const totalSamples = useMemo(
+    () => filteredItems.reduce((sum, d) => sum + (d.num_samples ?? 0), 0),
+    [filteredItems],
+  )
+
   return (
-    <div>
-      <h2 style={{ marginBottom: 24 }}>数据管理</h2>
-      {!p3UseMock ? (
-        <Alert
-          type="info"
-          showIcon
-          closable
-          style={{ marginBottom: 16 }}
-          message="已连接后端数据 API"
-          description="请从工作台进入「Demo Project」；勿使用仅存在于 MSW 的旧 mock 项目名（如「商品图像分类」）。"
+    <div className="p3-ds-page">
+      <header className="p3-ds-hero">
+        <h1>
+          发现与管理 <span className="p3-ds-accent">数据集</span>
+        </h1>
+        <p className="p3-ds-hero-desc">
+          上传 CSV / JSON / 图像，搜索与标签筛选，预览表格或画廊标注——为清洗与训练准备好数据。
+        </p>
+      </header>
+
+      <div className="p3-ds-toolbar">
+        <span className="p3-ds-toolbar-label">筛选</span>
+        <Select
+          allowClear
+          mode="multiple"
+          placeholder="按标签筛选"
+          style={{ minWidth: 180 }}
+          options={allTags.map((t) => ({ value: t, label: t }))}
+          value={tagFilter}
+          onChange={setTagFilter}
         />
-      ) : null}
-      {datasetsQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="无法加载数据集列表"
-          description={formatApiError(datasetsQuery.error, '请确认已进入 Demo Project 且后端已启动')}
+        <Input.Search
+          allowClear
+          placeholder="搜索数据集名称"
+          style={{ width: 240 }}
+          onSearch={setSearch}
         />
-      ) : null}
-      <Card title="数据上传" style={{ marginBottom: 16 }}>
-        <FileUpload
-          projectId={projectId}
-          multiple
-          accept=".csv,.json,.jsonl,image/*"
-          onSuccess={handleUploadSuccess}
-        />
-      </Card>
-      <Card
-        title="数据集列表"
-        extra={
-          <Space wrap>
-            <Select
-              allowClear
-              mode="multiple"
-              placeholder="按标签筛选"
-              style={{ minWidth: 160 }}
-              options={allTags.map((t) => ({ value: t, label: t }))}
-              value={tagFilter}
-              onChange={setTagFilter}
-            />
-            <Input.Search
-              allowClear
-              placeholder="搜索名称（服务端）"
-              style={{ width: 200 }}
-              onSearch={setSearch}
-            />
-          </Space>
-        }
-      >
-        <DataTable<Dataset>
-          rowKey="id"
-          columns={listColumns}
-          dataSource={filteredItems}
-          loading={datasetsQuery.isLoading}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
-        />
-      </Card>
+      </div>
+
+      <div className="p3-ds-body">
+        {!p3UseMock ? (
+          <Alert
+            type="info"
+            showIcon
+            closable
+            style={{ marginBottom: 16 }}
+            message="已连接后端数据 API"
+            description="请从工作台进入「Demo Project」；勿使用仅存在于 MSW 的旧 mock 项目名（如「商品图像分类」）。"
+          />
+        ) : null}
+        {datasetsQuery.isError ? (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="无法加载数据集列表"
+            description={formatApiError(datasetsQuery.error, '请确认已进入 Demo Project 且后端已启动')}
+          />
+        ) : null}
+
+        <div className="p3-ds-stats">
+          <div className="p3-ds-stat-card">
+            <span className="label">数据集</span>
+            <span className="value">{filteredItems.length}</span>
+          </div>
+          <div className="p3-ds-stat-card">
+            <span className="label">样本总量</span>
+            <span className="value green">{totalSamples.toLocaleString()}</span>
+          </div>
+          <div className="p3-ds-stat-card">
+            <span className="label">标签种类</span>
+            <span className="value">{allTags.length}</span>
+          </div>
+        </div>
+
+        <Card title="数据上传" className="p3-ds-card-upload">
+          <FileUpload
+            projectId={projectId}
+            multiple
+            accept=".csv,.json,.jsonl,image/*"
+            onSuccess={handleUploadSuccess}
+          />
+        </Card>
+        <Card title="数据集列表">
+          <DataTable<Dataset>
+            rowKey="id"
+            columns={listColumns}
+            dataSource={filteredItems}
+            loading={datasetsQuery.isLoading}
+            pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
+          />
+        </Card>
+      </div>
 
       <DatasetEditModal
         open={editOpen}
@@ -397,13 +426,7 @@ export default function DataManagementView({ projectId }: DataManagementViewProp
           />
         </Space>
         <Image.PreviewGroup>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 16,
-            }}
-          >
+          <div className="p3-ds-gallery-grid">
             {galleryItems.map((item: ImageItem) => {
               const id = item.id ?? ''
               const labels = localLabels[id] ?? item.labels ?? []

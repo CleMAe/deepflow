@@ -30,10 +30,17 @@ export default function ProjectCleaningPage() {
   ]
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 24 }}>数据清洗 · EDA · 数据增强</h2>
-      <Card>
-        <Tabs items={items} />
+    <div className="p3-ds-page">
+      <header className="p3-ds-hero">
+        <h1>
+          数据清洗 · <span className="p3-ds-accent">EDA</span> · 增强
+        </h1>
+        <p className="p3-ds-hero-desc">
+          像选品一样管理表格数据：清洗、探索性分析、图像增强，一站式完成上传后的数据处理。
+        </p>
+      </header>
+      <Card className="p3-ds-tabs-wrap" bordered={false}>
+        <Tabs items={items} size="large" />
       </Card>
     </div>
   )

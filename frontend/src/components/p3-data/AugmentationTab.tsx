@@ -5,12 +5,10 @@ import {
   Button,
   Card,
   Checkbox,
-  Col,
   Descriptions,
   Image,
   Input,
   InputNumber,
-  Row,
   Select,
   Slider,
   Space,
@@ -201,54 +199,53 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
   }
 
   return (
-    <div>
-      <Paragraph type="secondary">
-        图像增强（Pillow）与 train/val/test 划分；下方提供提交前 CSS 近似预览与提交后抽样对比。
+    <div className="p3-ds-body">
+      <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+        图像增强（Pillow）与 train/val/test 划分；提交前 CSS 近似预览，提交后抽样对比。
       </Paragraph>
 
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Card title="数据集" size="small">
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="选择图像数据集（增强 / 预览）"
-            style={{ minWidth: 320 }}
-            options={imageOptions}
-            value={datasetId}
-            onChange={(v) => {
-              setDatasetId(v)
-              setLastAugment(null)
-            }}
-            loading={datasetsQuery.isLoading}
-          />
-          <div style={{ marginTop: 12 }}>
-            <Text type="secondary">划分可使用任意数据集：</Text>
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择数据集（划分）"
-              style={{ minWidth: 320, marginLeft: 8 }}
-              options={allOptions}
-              value={datasetId}
-              onChange={setDatasetId}
-            />
-          </div>
-        </Card>
+      <div className="p3-ds-toolbar" style={{ margin: '0 0 20px', padding: '12px 0', background: 'transparent', border: 'none' }}>
+        <span className="p3-ds-toolbar-label">数据集</span>
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          placeholder="选择图像数据集（增强 / 预览）"
+          style={{ minWidth: 280 }}
+          options={imageOptions}
+          value={datasetId}
+          onChange={(v) => {
+            setDatasetId(v)
+            setLastAugment(null)
+          }}
+          loading={datasetsQuery.isLoading}
+        />
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          placeholder="划分用数据集（可与上相同）"
+          style={{ minWidth: 280 }}
+          options={allOptions}
+          value={datasetId}
+          onChange={setDatasetId}
+        />
+        {datasetId ? <span className="p3-ds-badge new">已选</span> : null}
+      </div>
 
-        <Card title="增强预览对比（提交前）" size="small">
+      <div className="p3-ds-tools-grid" style={{ marginBottom: 20 }}>
+        <Card title="增强预览（提交前）" size="small" className="p3-ds-tool-card" style={{ gridColumn: '1 / -1' }}>
           {!datasetId || !isImageDataset(selectedDataset) ? (
             <Text type="secondary">请选择图像数据集后查看原图与参数预览</Text>
           ) : !previewSrc ? (
             <Text type="secondary">加载样例图…</Text>
           ) : (
-            <Row gutter={24}>
-              <Col xs={24} md={12}>
+            <div className="p3-ds-preview-split">
+              <div className="p3-ds-preview-box">
                 <Title level={5}>原图</Title>
                 <Image src={previewSrc} alt="original" style={{ maxHeight: 220, objectFit: 'contain' }} />
-              </Col>
-              <Col xs={24} md={12}>
+              </div>
+              <div className="p3-ds-preview-box">
                 <Title level={5}>预览效果（CSS 近似）</Title>
                 <Image
                   src={previewSrc}
@@ -258,24 +255,22 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
                 <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
                   已选：{selectedTypes.join(', ') || '无'}
                 </Text>
-              </Col>
-            </Row>
+              </div>
+            </div>
           )}
         </Card>
 
-        <Card title="CV 数据增强" size="small">
+        <Card title="CV 数据增强" size="small" className="p3-ds-tool-card" style={{ gridColumn: '1 / -1' }}>
           <Checkbox.Group
+            className="p3-ds-pill-group"
             value={selectedTypes}
             onChange={(v) => setSelectedTypes(v as AugmentTransform['type'][])}
-            style={{ width: '100%', marginBottom: 12 }}
           >
-            <Space wrap>
-              {TRANSFORM_TYPES.map((x) => (
-                <Checkbox key={x} value={x}>
-                  {x}
-                </Checkbox>
-              ))}
-            </Space>
+            {TRANSFORM_TYPES.map((x) => (
+              <Checkbox key={x} value={x}>
+                {x}
+              </Checkbox>
+            ))}
           </Checkbox.Group>
           <Space wrap style={{ marginBottom: 12 }}>
             <Text>每图副本数：</Text>
@@ -296,26 +291,32 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
         </Card>
 
         {lastAugment?.new_dataset_id ? (
-          <Card title="增强结果对比（提交后抽样）" size="small" loading={compareQuery.isLoading}>
+          <Card
+            title="增强结果（提交后抽样）"
+            size="small"
+            className="p3-ds-tool-card"
+            style={{ gridColumn: '1 / -1' }}
+            loading={compareQuery.isLoading}
+          >
             {compareQuery.data?.orig && compareQuery.data?.aug ? (
-              <Row gutter={24}>
-                <Col xs={24} md={12}>
+              <div className="p3-ds-preview-split">
+                <div className="p3-ds-preview-box">
                   <Text type="secondary">源数据集</Text>
                   <Image
                     src={compareQuery.data.orig.thumbnail_path}
                     alt="before"
                     style={{ maxHeight: 200, marginTop: 8 }}
                   />
-                </Col>
-                <Col xs={24} md={12}>
+                </div>
+                <div className="p3-ds-preview-box">
                   <Text type="secondary">增强后 · {lastAugment.output_dataset_name}</Text>
                   <Image
                     src={compareQuery.data.aug.thumbnail_path}
                     alt="after"
                     style={{ maxHeight: 200, marginTop: 8 }}
                   />
-                </Col>
-              </Row>
+                </div>
+              </div>
             ) : (
               <Text type="secondary">增强完成，新数据集 ID：{lastAugment.new_dataset_id}</Text>
             )}
@@ -326,7 +327,7 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
           </Card>
         ) : null}
 
-        <Card title="数据集划分 (train / val / test)" size="small">
+        <Card title="数据集划分 (train / val / test)" size="small" className="p3-ds-tool-card">
           <Space wrap style={{ marginBottom: 12 }}>
             <Text>train</Text>
             <InputNumber min={0.01} max={0.99} step={0.05} value={trainRatio} onChange={(v) => setTrainRatio(Number(v) || 0.7)} />
@@ -335,21 +336,27 @@ export default function AugmentationTab({ projectId }: AugmentationTabProps) {
             <Text>test（自动）</Text>
             <Text type="secondary">{(1 - trainRatio - valRatio).toFixed(2)}</Text>
           </Space>
-          <Button onClick={onSplit} loading={splitMut.isPending}>
+          <Button type="primary" onClick={onSplit} loading={splitMut.isPending}>
             执行划分
           </Button>
         </Card>
 
         {lastSplit ? (
-          <Card title="划分结果" size="small">
+          <Card title="划分结果" size="small" className="p3-ds-tool-card">
             <Descriptions column={1} size="small" bordered>
-              <Descriptions.Item label="train">{lastSplit.train_count} · {lastSplit.train_dataset_id}</Descriptions.Item>
-              <Descriptions.Item label="val">{lastSplit.val_count} · {lastSplit.val_dataset_id ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="test">{lastSplit.test_count} · {lastSplit.test_dataset_id ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="train">
+                {lastSplit.train_count} · {lastSplit.train_dataset_id}
+              </Descriptions.Item>
+              <Descriptions.Item label="val">
+                {lastSplit.val_count} · {lastSplit.val_dataset_id ?? '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="test">
+                {lastSplit.test_count} · {lastSplit.test_dataset_id ?? '-'}
+              </Descriptions.Item>
             </Descriptions>
           </Card>
         ) : null}
-      </Space>
+      </div>
     </div>
   )
 }
