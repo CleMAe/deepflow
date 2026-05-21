@@ -269,6 +269,26 @@ class PandasCleaningEngine:
         elif body.method == "one_hot":
             df = pd.get_dummies(df, columns=columns_affected, prefix=columns_affected, dtype=int)
             columns_affected = [c for c in df.columns if any(c.startswith(f"{x}_") for x in body.columns)]
+        elif body.method == "frequency_encoding":
+            for col in columns_affected:
+                freq = df[col].value_counts(normalize=True)
+                df[col] = df[col].map(freq).fillna(0.0)
+        elif body.method == "target_encoding":
+            target = body.target_column
+            if not target or target not in df.columns:
+                raise AppError.bad_request(
+                    "target_encoding requires target_column present in dataset",
+                    code=ERR_DATASET_INVALID_PARAM,
+                )
+            if not pd.api.types.is_numeric_dtype(df[target]):
+                raise AppError.bad_request(
+                    "target_encoding requires a numeric target_column",
+                    code=ERR_DATASET_INVALID_PARAM,
+                )
+            global_mean = float(df[target].mean())
+            for col in columns_affected:
+                means = df.groupby(col, dropna=False)[target].mean()
+                df[col] = df[col].map(means).fillna(global_mean)
         else:
             raise AppError.bad_request(f"Unsupported encode method: {body.method}", code=ERR_DATASET_INVALID_PARAM)
 

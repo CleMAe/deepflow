@@ -1,18 +1,18 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
 from app.api.deps import (
     get_augmentation_service,
-    get_dataset_service,
     get_eda_service,
+    get_split_service,
     require_project_access,
 )
 from app.core.response import success
-from app.schemas.eda import AugmentRequest, EdaRequest, SplitRequest, SplitResultSchema
+from app.schemas.eda import AugmentRequest, EdaRequest, SplitRequest
 from app.services.augmentation_service import PillowAugmentationService
-from app.services.dataset_service import DatasetService
 from app.services.eda_service import PandasEdaService
+from app.services.split_service import PandasSplitService
 
 router = APIRouter(prefix="/projects/{project_id}/datasets/{ds_id}", tags=["EDA"])
 
@@ -64,23 +64,7 @@ async def split_dataset(
     ds_id: UUID,
     body: SplitRequest,
     _: UUID = Depends(require_project_access),
-    svc: DatasetService = Depends(get_dataset_service),
+    split_svc: PandasSplitService = Depends(get_split_service),
 ):
-    # Day3 placeholder: returns counts and UUIDs only; does not write split files to disk.
-    source = svc.get(project_id, ds_id)
-    n = source.num_samples or 100
-    train_r = body.ratios.train
-    val_r = body.ratios.val or 0.0
-    test_r = body.ratios.test or max(0.0, 1.0 - train_r - val_r)
-    train_n = int(n * train_r)
-    val_n = int(n * val_r)
-    test_n = n - train_n - val_n
-    result = SplitResultSchema(
-        train_dataset_id=uuid4(),
-        val_dataset_id=uuid4() if val_r else None,
-        test_dataset_id=uuid4() if test_r else None,
-        train_count=train_n,
-        val_count=val_n,
-        test_count=test_n,
-    )
+    result = split_svc.split(project_id, ds_id, body)
     return success(result.model_dump(mode="json"))
