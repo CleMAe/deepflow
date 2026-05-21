@@ -26,6 +26,7 @@ class CleanDedupRequest(BaseModel):
 class CleanEncodeRequest(BaseModel):
     columns: list[str]
     method: str = "one_hot"
+    target_column: str | None = None
 
 
 class TypeConversionItem(BaseModel):
