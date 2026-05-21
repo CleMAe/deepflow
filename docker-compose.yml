@@ -33,9 +33,16 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-deepflow}:${POSTGRES_PASSWORD:-deepflow}@db:5432/${POSTGRES_DB:-deepflow}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-deepflow}:${POSTGRES_PASSWORD:-deepflow}@db:5432/${POSTGRES_DB:-deepflow}
       STORAGE_ROOT: /data/storage
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      MOCK_MODE: "false"
+      LLM_DEFAULT_PROVIDER: ${LLM_DEFAULT_PROVIDER:-mock}
+      LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-deepseek-chat}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      AGENT_MAX_TOOL_ROUNDS: ${AGENT_MAX_TOOL_ROUNDS:-5}
+      AGENT_MAX_HISTORY_MESSAGES: ${AGENT_MAX_HISTORY_MESSAGES:-50}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -45,6 +52,9 @@ services:
     build:
       context: .
       dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+        VITE_ENABLE_MSW: "false"
     container_name: deepflow-frontend
     restart: unless-stopped
     depends_on:
