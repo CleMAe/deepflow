@@ -103,7 +103,8 @@ def _make_synthetic_cv_loader(
 def _load_tabular_dataset(
     dataset_path: str,
     batch_size: int = 32,
-) -> DataLoader | None:
+) -> tuple[DataLoader, bool] | None:
+    """Load tabular CSV/JSON dataset. Returns (loader, is_regression) or None."""
     path = Path(dataset_path)
     if not path.exists():
         return None
@@ -117,9 +118,15 @@ def _load_tabular_dataset(
         df = pd.read_csv(path) if suffix == ".csv" else pd.read_json(path)
         label_col = df.columns[-1]
         X = torch.tensor(df.drop(columns=[label_col]).select_dtypes(include="number").values, dtype=torch.float32)
-        labels = df[label_col].astype("category").cat.codes.values
+        if X.shape[1] == 0:
+            return None
+        label_series = df[label_col]
+        if label_series.dtype in ("float64", "float32", "int64", "int32") and label_series.nunique() > 20:
+            y = torch.tensor(label_series.values, dtype=torch.float32).unsqueeze(1)
+            return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True), True
+        labels = label_series.astype("category").cat.codes.values
         y = torch.tensor(labels, dtype=torch.long)
-        return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
+        return DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True), False
     except Exception:
         return None
 
@@ -174,28 +181,27 @@ def _load_dataset(
     arch_type: str,
     batch_size: int = 32,
     is_val: bool = False,
-) -> DataLoader:
-    """Try loading real dataset; fall back to synthetic only when file/dir missing."""
+) -> tuple[DataLoader, bool]:
+    """Try loading real dataset; fall back to synthetic only when file/dir missing.
+    Returns (loader, is_regression).
+    """
     is_cv = _is_cv_arch(arch_type)
 
     if is_cv:
-        # For CV archs, try ImageFolder first, then tabular (some users store
-        # image metadata as CSV), then synthetic
         loader = _load_image_dataset(dataset_path, batch_size)
         if loader is not None:
-            return loader
-        loader = _load_tabular_dataset(dataset_path, batch_size)
-        if loader is not None:
-            return loader
+            return loader, False
+        result = _load_tabular_dataset(dataset_path, batch_size)
+        if result is not None:
+            return result
         n = 64 if is_val else 256
-        return _make_synthetic_cv_loader(n_samples=n, batch_size=batch_size)
+        return _make_synthetic_cv_loader(n_samples=n, batch_size=batch_size), False
     else:
-        # For tabular archs, try CSV/JSON first, then synthetic
-        loader = _load_tabular_dataset(dataset_path, batch_size)
-        if loader is not None:
-            return loader
+        result = _load_tabular_dataset(dataset_path, batch_size)
+        if result is not None:
+            return result
         n = 128 if is_val else 512
-        return _make_synthetic_loader(n_samples=n, batch_size=batch_size)
+        return _make_synthetic_loader(n_samples=n, batch_size=batch_size), False
 
 
 # ---------------------------------------------------------------------------
@@ -365,8 +371,11 @@ def _validate(
             loss = criterion(out, y)
 
         total_loss += loss.item() * X.size(0)
-        preds = out.argmax(dim=1) if out.dim() > 1 else (out > 0.5).long()
-        correct += (preds == y).sum().item()
+        preds = out.argmax(dim=1) if out.dim() > 1 and y.dim() == 1 else (out > 0.5).long()
+        if y.dtype in (torch.float32, torch.float64):
+            correct += (torch.abs(out.squeeze() - y.squeeze()) < 0.1 * y.squeeze().abs().clamp(min=1)).sum().item()
+        else:
+            correct += (preds == y).sum().item()
         total += y.size(0)
 
     avg_loss = total_loss / max(total, 1)
@@ -419,17 +428,21 @@ def run(args: argparse.Namespace) -> None:
     status = _init_status(args.status_file, epochs)
 
     # Dataset — try real data first, fall back to synthetic
-    train_loader = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=False)
+    train_loader, is_regression = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=False)
     val_loader: DataLoader | None = None
+    is_val_regression = is_regression
     if args.val_dataset_path:
-        val_loader = _load_dataset(args.val_dataset_path, args.model_arch, batch_size, is_val=True)
+        val_loader, is_val_regression = _load_dataset(args.val_dataset_path, args.model_arch, batch_size, is_val=True)
     if val_loader is None:
-        val_loader = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=True)
+        val_loader, is_val_regression = _load_dataset(args.dataset_path, args.model_arch, batch_size, is_val=True)
 
     # Infer input dim / n_classes from first batch
     sample_X, sample_y = next(iter(train_loader))
     input_dim = sample_X.shape[1] if sample_X.dim() > 1 else 1
-    n_classes = int(sample_y.max().item()) + 1 if sample_y.numel() > 0 else 3
+    if is_regression:
+        n_classes = 1
+    else:
+        n_classes = int(sample_y.max().item()) + 1 if sample_y.numel() > 0 else 3
 
     # Model
     model = _build_model(args.model_arch, n_classes=n_classes, input_dim=input_dim).to(device)

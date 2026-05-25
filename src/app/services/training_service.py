@@ -226,6 +226,13 @@ class TrainingService:
         """Sync subprocess status into DB. Also creates Experiment on terminal state."""
         progress = _engine.get_progress(str(job.id))
         if not progress:
+            # No status file — check if the subprocess died without writing one
+            if not _engine.is_process_alive(str(job.id)):
+                job.status = TrainingJobStatus.FAILED
+                job.error_message = "Training process exited without producing a status file"
+                job.finished_at = datetime.now(timezone.utc)
+                db.commit()
+                self._ensure_experiment(db, job)
             return
 
         job.current_epoch = progress.get("current_epoch", job.current_epoch)

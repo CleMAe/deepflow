@@ -66,10 +66,13 @@ class TrainingEngineManager:
         if hyperparams:
             cmd += ["--hyperparams", json.dumps(hyperparams)]
 
+        log_stdout = _STATUS_DIR / f"{job_id}.log"
+        log_file = open(log_stdout, "a")
+
         proc = subprocess.Popen(
             cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
         self._processes[job_id] = proc
